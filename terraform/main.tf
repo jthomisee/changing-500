@@ -1,4 +1,4 @@
-# DynamoDB Table
+# DynamoDB Table for Games
 resource "aws_dynamodb_table" "games_table" {
   name           = "${var.project_name}-games-${var.environment}"
   billing_mode   = "PAY_PER_REQUEST"
@@ -22,6 +22,33 @@ resource "aws_dynamodb_table" "games_table" {
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-games-${var.environment}"
+  })
+}
+
+# DynamoDB Table for Users
+resource "aws_dynamodb_table" "users_table" {
+  name           = "${var.project_name}-users-${var.environment}"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "userId"
+
+  attribute {
+    name = "userId"
+    type = "S"
+  }
+
+  attribute {
+    name = "email"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "email-index"
+    hash_key        = "email"
+    projection_type = "ALL"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-users-${var.environment}"
   })
 }
 
@@ -65,7 +92,9 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
         ]
         Resource = [
           aws_dynamodb_table.games_table.arn,
-          "${aws_dynamodb_table.games_table.arn}/index/*"
+          "${aws_dynamodb_table.games_table.arn}/index/*",
+          aws_dynamodb_table.users_table.arn,
+          "${aws_dynamodb_table.users_table.arn}/index/*"
         ]
       }
     ]
@@ -166,15 +195,98 @@ resource "aws_lambda_function" "delete_game" {
   tags = local.common_tags
 }
 
-# Validate Admin Lambda Function
-resource "aws_lambda_function" "validate_admin" {
+
+# Register User Lambda Function
+resource "aws_lambda_function" "register_user" {
   filename         = "lambda.zip"
-  function_name    = "${var.project_name}-validate-admin-${var.environment}"
+  function_name    = "${var.project_name}-register-user-${var.environment}"
   role            = aws_iam_role.lambda_execution_role.arn
-  handler         = "validateAdmin.handler"
+  handler         = "registerUser.handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime         = "nodejs18.x"
   timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Login User Lambda Function
+resource "aws_lambda_function" "login_user" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-login-user-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "loginUser.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Search Users Lambda Function
+resource "aws_lambda_function" "search_users" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-search-users-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "searchUsers.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# List Users Lambda Function (Admin only)
+resource "aws_lambda_function" "list_users" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-list-users-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "listUsers.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Update User Lambda Function (Admin only)
+resource "aws_lambda_function" "update_user" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-update-user-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "updateUser.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
 
   tags = local.common_tags
 }
@@ -205,17 +317,42 @@ resource "aws_api_gateway_resource" "game_resource" {
   path_part   = "{id}"
 }
 
-# API Gateway Resource for admin endpoints
-resource "aws_api_gateway_resource" "admin_resource" {
+
+# API Gateway Resource for user endpoints
+resource "aws_api_gateway_resource" "users_resource" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
   parent_id   = aws_api_gateway_rest_api.dealin_holden_api.root_resource_id
-  path_part   = "admin"
+  path_part   = "users"
 }
 
-resource "aws_api_gateway_resource" "admin_validate_resource" {
+resource "aws_api_gateway_resource" "users_register_resource" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
-  parent_id   = aws_api_gateway_resource.admin_resource.id
-  path_part   = "validate"
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "register"
+}
+
+resource "aws_api_gateway_resource" "users_login_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "login"
+}
+
+resource "aws_api_gateway_resource" "users_search_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "search"
+}
+
+resource "aws_api_gateway_resource" "users_manage_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "manage"
+}
+
+resource "aws_api_gateway_resource" "user_manage_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_manage_resource.id
+  path_part   = "{userId}"
 }
 
 # API Gateway Methods
@@ -247,16 +384,84 @@ resource "aws_api_gateway_method" "delete_game_method" {
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_method" "admin_validate_method" {
+
+# User Registration Methods
+resource "aws_api_gateway_method" "users_register_method" {
   rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id   = aws_api_gateway_resource.admin_validate_resource.id
+  resource_id   = aws_api_gateway_resource.users_register_resource.id
   http_method   = "POST"
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_method" "admin_validate_options_method" {
+resource "aws_api_gateway_method" "users_register_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id   = aws_api_gateway_resource.admin_validate_resource.id
+  resource_id   = aws_api_gateway_resource.users_register_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Login Methods
+resource "aws_api_gateway_method" "users_login_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_login_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_login_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_login_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Search Methods
+resource "aws_api_gateway_method" "users_search_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_search_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_search_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_search_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_search_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_search_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Management Methods (Admin only)
+resource "aws_api_gateway_method" "users_manage_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_manage_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_manage_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_manage_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "user_manage_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.user_manage_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "user_manage_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.user_manage_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -302,20 +507,127 @@ resource "aws_api_gateway_integration" "delete_game_integration" {
   uri                     = aws_lambda_function.delete_game.invoke_arn
 }
 
-resource "aws_api_gateway_integration" "admin_validate_integration" {
+
+# User Registration Integrations
+resource "aws_api_gateway_integration" "users_register_integration" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id = aws_api_gateway_resource.admin_validate_resource.id
-  http_method = aws_api_gateway_method.admin_validate_method.http_method
+  resource_id = aws_api_gateway_resource.users_register_resource.id
+  http_method = aws_api_gateway_method.users_register_method.http_method
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.validate_admin.invoke_arn
+  uri                     = aws_lambda_function.register_user.invoke_arn
 }
 
-resource "aws_api_gateway_integration" "admin_validate_options_integration" {
+resource "aws_api_gateway_integration" "users_register_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id = aws_api_gateway_resource.admin_validate_resource.id
-  http_method = aws_api_gateway_method.admin_validate_options_method.http_method
+  resource_id = aws_api_gateway_resource.users_register_resource.id
+  http_method = aws_api_gateway_method.users_register_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Login Integrations
+resource "aws_api_gateway_integration" "users_login_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_login_resource.id
+  http_method = aws_api_gateway_method.users_login_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.login_user.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_login_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_login_resource.id
+  http_method = aws_api_gateway_method.users_login_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Search Integrations
+resource "aws_api_gateway_integration" "users_search_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_search_resource.id
+  http_method = aws_api_gateway_method.users_search_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.search_users.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_search_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_search_resource.id
+  http_method = aws_api_gateway_method.users_search_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.search_users.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_search_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_search_resource.id
+  http_method = aws_api_gateway_method.users_search_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Management Integrations
+resource "aws_api_gateway_integration" "users_manage_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_manage_resource.id
+  http_method = aws_api_gateway_method.users_manage_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.list_users.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_manage_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_manage_resource.id
+  http_method = aws_api_gateway_method.users_manage_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "user_manage_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.user_manage_resource.id
+  http_method = aws_api_gateway_method.user_manage_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.update_user.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "user_manage_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.user_manage_resource.id
+  http_method = aws_api_gateway_method.user_manage_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -419,11 +731,11 @@ resource "aws_api_gateway_integration_response" "game_options_integration_respon
   }
 }
 
-# CORS Configuration for /admin/validate
-resource "aws_api_gateway_method_response" "admin_validate_options_200" {
+# CORS Configuration for User Endpoints
+resource "aws_api_gateway_method_response" "users_register_options_200" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id = aws_api_gateway_resource.admin_validate_resource.id
-  http_method = aws_api_gateway_method.admin_validate_options_method.http_method
+  resource_id = aws_api_gateway_resource.users_register_resource.id
+  http_method = aws_api_gateway_method.users_register_options_method.http_method
   status_code = "200"
 
   response_parameters = {
@@ -433,15 +745,67 @@ resource "aws_api_gateway_method_response" "admin_validate_options_200" {
   }
 }
 
-resource "aws_api_gateway_integration_response" "admin_validate_options_integration_response" {
+resource "aws_api_gateway_integration_response" "users_register_options_integration_response" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
-  resource_id = aws_api_gateway_resource.admin_validate_resource.id
-  http_method = aws_api_gateway_method.admin_validate_options_method.http_method
-  status_code = aws_api_gateway_method_response.admin_validate_options_200.status_code
+  resource_id = aws_api_gateway_resource.users_register_resource.id
+  http_method = aws_api_gateway_method.users_register_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_register_options_200.status_code
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS,POST,PUT,DELETE'"
+    "method.response.header.Access-Control-Allow-Methods" = "'OPTIONS,POST'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "users_login_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_login_resource.id
+  http_method = aws_api_gateway_method.users_login_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_login_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_login_resource.id
+  http_method = aws_api_gateway_method.users_login_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_login_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'OPTIONS,POST'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "users_search_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_search_resource.id
+  http_method = aws_api_gateway_method.users_search_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_search_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_search_resource.id
+  http_method = aws_api_gateway_method.users_search_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_search_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS,POST'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
@@ -479,10 +843,44 @@ resource "aws_lambda_permission" "delete_game_permission" {
   source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
 }
 
-resource "aws_lambda_permission" "validate_admin_permission" {
+
+# Lambda Permissions for User Endpoints
+resource "aws_lambda_permission" "register_user_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.validate_admin.function_name
+  function_name = aws_lambda_function.register_user.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "login_user_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.login_user.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "search_users_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.search_users.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "list_users_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.list_users.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "update_user_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.update_user.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
 }
@@ -496,8 +894,17 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
     aws_api_gateway_integration.delete_game_integration,
     aws_api_gateway_integration.games_options_integration,
     aws_api_gateway_integration.game_options_integration,
-    aws_api_gateway_integration.admin_validate_integration,
-    aws_api_gateway_integration.admin_validate_options_integration,
+    aws_api_gateway_integration.users_register_integration,
+    aws_api_gateway_integration.users_register_options_integration,
+    aws_api_gateway_integration.users_login_integration,
+    aws_api_gateway_integration.users_login_options_integration,
+    aws_api_gateway_integration.users_search_get_integration,
+    aws_api_gateway_integration.users_search_post_integration,
+    aws_api_gateway_integration.users_search_options_integration,
+    aws_api_gateway_integration.users_manage_get_integration,
+    aws_api_gateway_integration.users_manage_options_integration,
+    aws_api_gateway_integration.user_manage_put_integration,
+    aws_api_gateway_integration.user_manage_options_integration,
   ]
 
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
@@ -506,24 +913,46 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.games_resource.id,
       aws_api_gateway_resource.game_resource.id,
-      aws_api_gateway_resource.admin_resource.id,
-      aws_api_gateway_resource.admin_validate_resource.id,
+      aws_api_gateway_resource.users_resource.id,
+      aws_api_gateway_resource.users_register_resource.id,
+      aws_api_gateway_resource.users_login_resource.id,
+      aws_api_gateway_resource.users_search_resource.id,
+      aws_api_gateway_resource.users_manage_resource.id,
+      aws_api_gateway_resource.user_manage_resource.id,
       aws_api_gateway_method.get_games_method.id,
       aws_api_gateway_method.post_games_method.id,
       aws_api_gateway_method.put_game_method.id,
       aws_api_gateway_method.delete_game_method.id,
-      aws_api_gateway_method.admin_validate_method.id,
-      aws_api_gateway_method.admin_validate_options_method.id,
       aws_api_gateway_method.games_options_method.id,
       aws_api_gateway_method.game_options_method.id,
+      aws_api_gateway_method.users_register_method.id,
+      aws_api_gateway_method.users_register_options_method.id,
+      aws_api_gateway_method.users_login_method.id,
+      aws_api_gateway_method.users_login_options_method.id,
+      aws_api_gateway_method.users_search_get_method.id,
+      aws_api_gateway_method.users_search_post_method.id,
+      aws_api_gateway_method.users_search_options_method.id,
+      aws_api_gateway_method.users_manage_get_method.id,
+      aws_api_gateway_method.users_manage_options_method.id,
+      aws_api_gateway_method.user_manage_put_method.id,
+      aws_api_gateway_method.user_manage_options_method.id,
       aws_api_gateway_integration.get_games_integration.id,
       aws_api_gateway_integration.post_games_integration.id,
       aws_api_gateway_integration.put_game_integration.id,
       aws_api_gateway_integration.delete_game_integration.id,
-      aws_api_gateway_integration.admin_validate_integration.id,
-      aws_api_gateway_integration.admin_validate_options_integration.id,
       aws_api_gateway_integration.games_options_integration.id,
       aws_api_gateway_integration.game_options_integration.id,
+      aws_api_gateway_integration.users_register_integration.id,
+      aws_api_gateway_integration.users_register_options_integration.id,
+      aws_api_gateway_integration.users_login_integration.id,
+      aws_api_gateway_integration.users_login_options_integration.id,
+      aws_api_gateway_integration.users_search_get_integration.id,
+      aws_api_gateway_integration.users_search_post_integration.id,
+      aws_api_gateway_integration.users_search_options_integration.id,
+      aws_api_gateway_integration.users_manage_get_integration.id,
+      aws_api_gateway_integration.users_manage_options_integration.id,
+      aws_api_gateway_integration.user_manage_put_integration.id,
+      aws_api_gateway_integration.user_manage_options_integration.id,
     ]))
   }
 
