@@ -44,7 +44,7 @@ const verifyJWT = (token, secret) => {
 };
 
 // Helper function to verify JWT from request headers
-const verifyAuthHeader = async (event) => {
+const verifyAuthHeader = async (authHeader) => {
   try {
     // Get JWT secret from Parameter Store
     const getParameterCommand = new GetParameterCommand({
@@ -55,9 +55,6 @@ const verifyAuthHeader = async (event) => {
     const parameterResponse = await ssmClient.send(getParameterCommand);
     const jwtSecret = parameterResponse.Parameter.Value;
 
-    // Extract token from Authorization header
-    const authHeader = event.headers?.Authorization || event.headers?.authorization;
-    
     if (!authHeader) {
       return { valid: false, error: 'No authorization header' };
     }
@@ -103,7 +100,8 @@ exports.handler = async (event) => {
   }
 
   try {
-    const verification = await verifyAuthHeader(event);
+    const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    const verification = await verifyAuthHeader(authHeader);
     
     return {
       statusCode: verification.valid ? 200 : 401,

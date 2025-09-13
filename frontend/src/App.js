@@ -15,6 +15,7 @@ import LoadingButton from './components/common/LoadingButton';
 import SortableHeader from './components/common/SortableHeader';
 import PlayerInput from './components/games/PlayerInput';
 import UserManagement from './components/admin/UserManagement';
+import UserProfile from './components/user/UserProfile';
 
 // Utils
 import { calculatePoints } from './utils/gameUtils';
@@ -88,7 +89,7 @@ const DealinHolden = () => {
 
   // Local state for modals and views
   const [showUserAuth, setShowUserAuth] = useState(false);
-  const [activeView, setActiveView] = useState('games'); // 'games' or 'users'
+  const [activeView, setActiveView] = useState('games'); // 'games', 'users', or 'profile'
 
   // Load games on mount
   useEffect(() => {
@@ -193,8 +194,8 @@ const DealinHolden = () => {
             />
           </div>
 
-          {/* Admin Navigation */}
-          {isAdmin && (
+          {/* Navigation */}
+          {currentUser && (
             <div className="flex justify-center items-center gap-2 mt-4">
               <button
                 onClick={() => setActiveView('games')}
@@ -208,29 +209,34 @@ const DealinHolden = () => {
                 Games
               </button>
               <button
-                onClick={() => setActiveView('users')}
+                onClick={() => setActiveView('profile')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeView === 'users'
+                  activeView === 'profile'
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <Settings className="w-4 h-4 inline mr-2" />
-                User Management
+                <Users className="w-4 h-4 inline mr-2" />
+                My Profile
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveView('users')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeView === 'users'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 inline mr-2" />
+                  User Management
+                </button>
+              )}
             </div>
           )}
           
           {/* Status indicators */}
-          <div className="flex justify-center items-center gap-4 mt-4">
-            <LoadingButton
-              loading={gamesLoading}
-              onClick={loadAllGames}
-              className="text-gray-600 hover:text-gray-800 text-sm underline"
-            >
-              Refresh Data
-            </LoadingButton>
-            
+          <div className="flex justify-center items-center gap-4 mt-4">           
             {gamesError && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
                 {gamesError}
@@ -244,6 +250,13 @@ const DealinHolden = () => {
             )}
           </div>
         </div>
+
+        {/* User Profile View */}
+        {activeView === 'profile' && (
+          <div className="mb-8">
+            <UserProfile />
+          </div>
+        )}
 
         {/* Admin User Management View */}
         {isAdmin && activeView === 'users' && (
@@ -579,8 +592,7 @@ const DealinHolden = () => {
             ))}
           </div>
         </div>
-      </div>
-
+      
       {/* Game Form Modal */}
       {showAddGame && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -726,8 +738,8 @@ const DealinHolden = () => {
           </div>
         </div>
       )}
-        </>
-        )}
+      </>
+    )}
 
         {/* Modals */}
         <LoginModal

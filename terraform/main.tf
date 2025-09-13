@@ -291,6 +291,44 @@ resource "aws_lambda_function" "update_user" {
   tags = local.common_tags
 }
 
+# Update My Profile Lambda Function (User self-edit)
+resource "aws_lambda_function" "update_my_profile" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-update-my-profile-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "updateMyProfile.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Change Password Lambda Function (User self-edit)
+resource "aws_lambda_function" "change_password" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-change-password-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "changePassword.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs18.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # API Gateway
 resource "aws_api_gateway_rest_api" "dealin_holden_api" {
   name        = "${var.project_name}-api-${var.environment}"
@@ -353,6 +391,18 @@ resource "aws_api_gateway_resource" "user_manage_resource" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
   parent_id   = aws_api_gateway_resource.users_manage_resource.id
   path_part   = "{userId}"
+}
+
+resource "aws_api_gateway_resource" "users_profile_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "profile"
+}
+
+resource "aws_api_gateway_resource" "users_password_resource" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "password"
 }
 
 # API Gateway Methods
@@ -462,6 +512,36 @@ resource "aws_api_gateway_method" "user_manage_put_method" {
 resource "aws_api_gateway_method" "user_manage_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
   resource_id   = aws_api_gateway_resource.user_manage_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Profile Methods (self-edit)
+resource "aws_api_gateway_method" "users_profile_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_profile_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_profile_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_profile_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Password Change Methods
+resource "aws_api_gateway_method" "users_password_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_password_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_password_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id   = aws_api_gateway_resource.users_password_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -628,6 +708,54 @@ resource "aws_api_gateway_integration" "user_manage_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
   resource_id = aws_api_gateway_resource.user_manage_resource.id
   http_method = aws_api_gateway_method.user_manage_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Profile Integrations
+resource "aws_api_gateway_integration" "users_profile_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_profile_resource.id
+  http_method = aws_api_gateway_method.users_profile_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.update_my_profile.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_profile_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_profile_resource.id
+  http_method = aws_api_gateway_method.users_profile_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Password Change Integrations
+resource "aws_api_gateway_integration" "users_password_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_password_resource.id
+  http_method = aws_api_gateway_method.users_password_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.change_password.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_password_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_password_resource.id
+  http_method = aws_api_gateway_method.users_password_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -810,6 +938,111 @@ resource "aws_api_gateway_integration_response" "users_search_options_integratio
   }
 }
 
+# Additional CORS configurations for missing endpoints
+resource "aws_api_gateway_method_response" "users_manage_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_manage_resource.id
+  http_method = aws_api_gateway_method.users_manage_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_manage_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_manage_resource.id
+  http_method = aws_api_gateway_method.users_manage_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_manage_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "user_manage_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.user_manage_resource.id
+  http_method = aws_api_gateway_method.user_manage_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "user_manage_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.user_manage_resource.id
+  http_method = aws_api_gateway_method.user_manage_options_method.http_method
+  status_code = aws_api_gateway_method_response.user_manage_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "users_profile_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_profile_resource.id
+  http_method = aws_api_gateway_method.users_profile_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_profile_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_profile_resource.id
+  http_method = aws_api_gateway_method.users_profile_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_profile_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "users_password_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_password_resource.id
+  http_method = aws_api_gateway_method.users_password_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_password_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
+  resource_id = aws_api_gateway_resource.users_password_resource.id
+  http_method = aws_api_gateway_method.users_password_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_password_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
 # Lambda Permissions for API Gateway
 resource "aws_lambda_permission" "get_games_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"
@@ -885,6 +1118,22 @@ resource "aws_lambda_permission" "update_user_permission" {
   source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "update_my_profile_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.update_my_profile.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "change_password_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.change_password.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/*/*"
+}
+
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
   depends_on = [
@@ -905,6 +1154,14 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
     aws_api_gateway_integration.users_manage_options_integration,
     aws_api_gateway_integration.user_manage_put_integration,
     aws_api_gateway_integration.user_manage_options_integration,
+    aws_api_gateway_integration.users_profile_put_integration,
+    aws_api_gateway_integration.users_profile_options_integration,
+    aws_api_gateway_integration.users_password_put_integration,
+    aws_api_gateway_integration.users_password_options_integration,
+    aws_api_gateway_integration_response.users_manage_options_integration_response,
+    aws_api_gateway_integration_response.user_manage_options_integration_response,
+    aws_api_gateway_integration_response.users_profile_options_integration_response,
+    aws_api_gateway_integration_response.users_password_options_integration_response,
   ]
 
   rest_api_id = aws_api_gateway_rest_api.dealin_holden_api.id
@@ -919,6 +1176,8 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
       aws_api_gateway_resource.users_search_resource.id,
       aws_api_gateway_resource.users_manage_resource.id,
       aws_api_gateway_resource.user_manage_resource.id,
+      aws_api_gateway_resource.users_profile_resource.id,
+      aws_api_gateway_resource.users_password_resource.id,
       aws_api_gateway_method.get_games_method.id,
       aws_api_gateway_method.post_games_method.id,
       aws_api_gateway_method.put_game_method.id,
@@ -936,6 +1195,10 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
       aws_api_gateway_method.users_manage_options_method.id,
       aws_api_gateway_method.user_manage_put_method.id,
       aws_api_gateway_method.user_manage_options_method.id,
+      aws_api_gateway_method.users_profile_put_method.id,
+      aws_api_gateway_method.users_profile_options_method.id,
+      aws_api_gateway_method.users_password_put_method.id,
+      aws_api_gateway_method.users_password_options_method.id,
       aws_api_gateway_integration.get_games_integration.id,
       aws_api_gateway_integration.post_games_integration.id,
       aws_api_gateway_integration.put_game_integration.id,
@@ -953,6 +1216,18 @@ resource "aws_api_gateway_deployment" "dealin_holden_api_deployment" {
       aws_api_gateway_integration.users_manage_options_integration.id,
       aws_api_gateway_integration.user_manage_put_integration.id,
       aws_api_gateway_integration.user_manage_options_integration.id,
+      aws_api_gateway_integration.users_profile_put_integration.id,
+      aws_api_gateway_integration.users_profile_options_integration.id,
+      aws_api_gateway_integration.users_password_put_integration.id,
+      aws_api_gateway_integration.users_password_options_integration.id,
+      aws_api_gateway_method_response.users_manage_options_200.id,
+      aws_api_gateway_method_response.user_manage_options_200.id,
+      aws_api_gateway_method_response.users_profile_options_200.id,
+      aws_api_gateway_method_response.users_password_options_200.id,
+      aws_api_gateway_integration_response.users_manage_options_integration_response.id,
+      aws_api_gateway_integration_response.user_manage_options_integration_response.id,
+      aws_api_gateway_integration_response.users_profile_options_integration_response.id,
+      aws_api_gateway_integration_response.users_password_options_integration_response.id,
     ]))
   }
 

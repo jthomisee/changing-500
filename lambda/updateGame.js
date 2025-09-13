@@ -23,7 +23,7 @@ exports.handler = async (event) => {
   }
 
   // Verify JWT token for authentication
-  const authResult = await verifyAuthHeader(event);
+  const authResult = await verifyAuthHeader(event.headers?.Authorization || event.headers?.authorization);
   if (!authResult.valid) {
     return {
       statusCode: 401,
