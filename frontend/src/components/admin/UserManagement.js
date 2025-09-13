@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit, Users, Crown, X, Save, Loader } from 'lucide-react';
-import { listAllUsers, updateUserById } from '../../services/userManagementService';
+import { Search, Edit, Users, Crown, X, Save, Loader, RotateCcw, Copy, Eye, EyeOff } from 'lucide-react';
+import { listAllUsers, updateUserById, resetUserPassword } from '../../services/userManagementService';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -16,6 +16,15 @@ const UserManagement = () => {
     isAdmin: false
   });
   const [saving, setSaving] = useState(false);
+
+  // Password reset state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetUserId, setResetUserId] = useState(null);
+  const [resetUserName, setResetUserName] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState('');
+  const [showTempPassword, setShowTempPassword] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -87,6 +96,62 @@ const UserManagement = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetPasswordClick = (user) => {
+    setResetUserId(user.userId);
+    setResetUserName(`${user.firstName} ${user.lastName}`);
+    setShowResetConfirm(true);
+    setTempPassword('');
+    setShowTempPassword(false);
+  };
+
+  const handleResetPasswordConfirm = async () => {
+    if (!resetUserId) return;
+
+    setResettingPassword(true);
+    try {
+      const result = await resetUserPassword(resetUserId);
+      if (result.success) {
+        setTempPassword(result.tempPassword);
+        setShowTempPassword(true);
+        setShowResetConfirm(false);
+        setError('');
+        // Update the user in local state (passwordResetRequired flag)
+        setUsers(prev => prev.map(u => 
+          u.userId === resetUserId ? result.user : u
+        ));
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Failed to reset password');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const handleResetPasswordCancel = () => {
+    setShowResetConfirm(false);
+    setResetUserId(null);
+    setResetUserName('');
+    setTempPassword('');
+    setShowTempPassword(false);
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // Could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  };
+
+  const closeTempPasswordModal = () => {
+    setShowTempPassword(false);
+    setTempPassword('');
+    setPasswordVisible(false);
   };
 
   const formatDate = (dateString) => {
@@ -192,13 +257,22 @@ const UserManagement = () => {
                   </td>
                   <td className="px-4 py-3 text-gray-900">{formatDate(user.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => openEditModal(user)}
-                      className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                      title="Edit User"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded-md hover:bg-blue-50 transition-colors"
+                        title="Edit user"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleResetPasswordClick(user)}
+                        className="text-red-600 hover:text-red-800 p-1 rounded-md hover:bg-red-50 transition-colors"
+                        title="Reset password"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -324,6 +398,141 @@ const UserManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-red-900">Reset Password</h3>
+              <button
+                onClick={handleResetPasswordCancel}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <RotateCcw className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Reset Password for:</p>
+                  <p className="text-sm text-gray-600">{resetUserName}</p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> This will generate a new temporary password. 
+                  The user will need to change it on their next login.
+                </p>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to reset this user's password? They will receive 
+                a temporary password that must be changed on next login.
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={handleResetPasswordCancel}
+                  disabled={resettingPassword}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetPasswordConfirm}
+                  disabled={resettingPassword}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resettingPassword ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                  {resettingPassword ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Temporary Password Display Modal */}
+      {showTempPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-green-900">Password Reset Complete</h3>
+              <button
+                onClick={closeTempPasswordModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <RotateCcw className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">New Temporary Password</p>
+                  <p className="text-sm text-gray-600">For: {resetUserName}</p>
+                </div>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-green-800">Temporary Password:</label>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPasswordVisible(!passwordVisible)}
+                      className="text-green-600 hover:text-green-800 p-1"
+                      title={passwordVisible ? 'Hide password' : 'Show password'}
+                    >
+                      {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button
+                      onClick={() => copyToClipboard(tempPassword)}
+                      className="text-green-600 hover:text-green-800 p-1"
+                      title="Copy to clipboard"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-white border border-green-300 rounded px-3 py-2">
+                  <code className="text-sm font-mono text-gray-900">
+                    {passwordVisible ? tempPassword : '••••••••••••'}
+                  </code>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Important:</strong> Please securely communicate this password to the user. 
+                  They will be required to change it on their next login.
+                </p>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={closeTempPasswordModal}
+                  className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

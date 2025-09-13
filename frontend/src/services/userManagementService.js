@@ -32,3 +32,21 @@ export const updateUserById = async (userId, userData) => {
     return { success: false, error: error.message };
   }
 };
+
+export const resetUserPassword = async (userId) => {
+  try {
+    const data = await apiCall(`/users/manage/${userId}/reset-password`, {
+      method: 'PUT'
+    });
+
+    return { 
+      success: true, 
+      user: data.user,
+      tempPassword: data.tempPassword,
+      instructions: data.instructions
+    };
+  } catch (error) {
+    console.error('Failed to reset user password:', error);
+    return { success: false, error: error.message };
+  }
+};
