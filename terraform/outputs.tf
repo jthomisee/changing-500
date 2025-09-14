@@ -1,11 +1,11 @@
 output "api_gateway_url" {
   description = "URL of the API Gateway"
-  value       = "${aws_api_gateway_rest_api.dealin_holden_api.execution_arn}/${var.environment}"
+  value       = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/${var.environment}"
 }
 
 output "api_gateway_invoke_url" {
   description = "Invoke URL of the API Gateway"
-  value       = aws_api_gateway_stage.dealin_holden_api_stage.invoke_url
+  value       = aws_api_gateway_stage.changing_500_api_stage.invoke_url
 }
 
 output "dynamodb_table_name" {
@@ -35,7 +35,7 @@ output "lambda_create_game_function_name" {
 
 output "website_url" {
   description = "Website URL with custom domain"
-  value       = "https://dealinholden.com"
+  value       = "https://changing500.com"
 }
 
 output "certificate_arn" {

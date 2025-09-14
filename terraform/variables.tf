@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "dealin-holden"
+  default     = "changing-500"
 }
 
 variable "environment" {
@@ -19,7 +19,7 @@ variable "environment" {
 variable "domain_name" {
   description = "Custom domain name"
   type        = string
-  default     = "dealinholden.com"
+  default     = "changing500.com"
 }
 
 locals {
