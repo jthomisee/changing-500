@@ -283,20 +283,8 @@ const Changing500 = () => {
                 <h1 className="text-2xl font-bold text-gray-800">Changing 500</h1>
               </button>
               
-              {/* User Actions - Below title */}
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                {currentUser && (
-                  <GroupSelector
-                    groups={groups}
-                    selectedGroup={selectedGroup}
-                    onSelectGroup={selectGroup}
-                    onCreateGroup={() => setShowCreateGroup(true)}
-                    loading={loadingGroups}
-                    error={groupError}
-                    isAdmin={isAdmin}
-                  />
-                )}
-                
+              {/* User Actions - Below title, stacked vertically */}
+              <div className="flex flex-col items-center gap-3">
                 {currentUser ? (
                   <UserDropdown 
                     onProfileClick={() => setActiveView('profile')} 
@@ -309,11 +297,23 @@ const Changing500 = () => {
                     onShowUserAuth={() => setShowUserAuth(true)}
                   />
                 )}
+                
+                {currentUser && (
+                  <GroupSelector
+                    groups={groups}
+                    selectedGroup={selectedGroup}
+                    onSelectGroup={selectGroup}
+                    onCreateGroup={() => setShowCreateGroup(true)}
+                    loading={loadingGroups}
+                    error={groupError}
+                    isAdmin={isAdmin}
+                  />
+                )}
               </div>
             </div>
           ) : (
-            // Desktop: Horizontal layout (unchanged)
-            <div className="flex items-center justify-between mb-4 overflow-hidden">
+            // Desktop: Horizontal layout
+            <div className="flex items-center justify-between mb-4">
               {/* Left: App Title */}
               <button 
                 onClick={() => setActiveView('games')}
