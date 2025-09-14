@@ -51,12 +51,32 @@ export const calculateSeasonStandings = (games, users = []) => {
     game.results.forEach(result => {
       // Use userId as the key instead of player name
       const userId = result.userId;
-      const user = userLookup[userId];
+      let user = userLookup[userId];
       
-      // Skip if no userId or user not found
-      if (!userId || !user) {
-        console.warn('Game result missing userId or user not found:', result);
+      // Skip if no userId
+      if (!userId) {
+        console.warn('Game result missing userId:', result);
         return;
+      }
+      
+      // Create placeholder user data if user not found (likely removed/deleted user)
+      if (!user) {
+        // Only warn if this is likely a real missing user (not a loading state issue)
+        if (users.length > 0) {
+          console.warn('User not found for game result:', { userId, gameDate: game.date });
+        }
+        
+        user = {
+          userId: userId,
+          firstName: 'Unknown',
+          lastName: 'User',
+          email: `unknown-${userId.slice(-8)}@placeholder.com`,
+          displayName: `Unknown User (${userId.slice(-8)})`,
+          isStub: false,
+          isPlaceholder: true // Flag to indicate this is a placeholder
+        };
+        // Add to lookup to avoid creating duplicates
+        userLookup[userId] = user;
       }
       
       if (!playerStats[userId]) {
@@ -122,7 +142,11 @@ export const calculateSeasonStandings = (games, users = []) => {
     return {
       ...stats,
       // Add display name for compatibility with existing UI
-      player: stats.user ? `${stats.user.firstName || ''} ${stats.user.lastName || ''}`.trim() || stats.user.email || 'Unknown' : 'Unknown User',
+      player: stats.user 
+        ? stats.user.isPlaceholder
+          ? `${stats.user.displayName} (Removed)`
+          : `${stats.user.firstName || ''} ${stats.user.lastName || ''}`.trim() || stats.user.displayName || stats.user.email || 'Unknown'
+        : 'Unknown User',
       winnings,
       totalBuyins,
       netWinnings,

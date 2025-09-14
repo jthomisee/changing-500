@@ -86,8 +86,10 @@ const Changing500 = () => {
     standings,
     sortField,
     sortDirection,
-    handleSort
-  } = useStandings(filteredGames, groupUsers);
+    handleSort,
+    getSortIcon,
+    isLoading: standingsLoading
+  } = useStandings(filteredGames, groupUsers, groupUsersLoading);
 
   // Game Form
   const {
@@ -466,7 +468,22 @@ const Changing500 = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {standings.map((player) => {
+                {standingsLoading ? (
+                  <tr>
+                    <td colSpan="10" className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <div className="text-gray-500">Loading standings...</div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : standings.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" className="px-6 py-12 text-center text-gray-500">
+                      No games found for this group. Add some games to see standings!
+                    </td>
+                  </tr>
+                ) : standings.map((player) => {
                   const getRowColorClass = () => {
                     if (player.rank === 1) return 'bg-gradient-to-r from-yellow-100 to-yellow-50 hover:from-yellow-200 hover:to-yellow-100';
                     if (player.rank === 2) return 'bg-gradient-to-r from-slate-200 to-slate-100 hover:from-slate-300 hover:to-slate-200';

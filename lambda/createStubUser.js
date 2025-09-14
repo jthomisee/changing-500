@@ -105,7 +105,6 @@ exports.handler = async (event) => {
         if (emailResult.Items.length > 0) {
           user = emailResult.Items[0];
           isExistingUser = true;
-          console.log('Found existing user by email:', user.userId);
         }
       }
 
@@ -123,14 +122,12 @@ exports.handler = async (event) => {
         if (phoneResult.Items.length > 0) {
           user = phoneResult.Items[0];
           isExistingUser = true;
-          console.log('Found existing user by phone:', user.userId);
         }
       }
     }
 
     // Step 2: If user found, add them to the group (if not already a member)
     if (isExistingUser) {
-      console.log('Adding existing user to group...');
       
       // Check if user is already in the group
       const existingMembership = await dynamodb.send(new GetCommand({
@@ -150,13 +147,11 @@ exports.handler = async (event) => {
           }
         };
         await dynamodb.send(new PutCommand(membershipParams));
-        console.log('Added existing user to group as member');
       } else {
         console.log('User already in group');
       }
     } else if (email || phone) {
       // Step 3: Create full account if email/phone provided but user not found
-      console.log('Creating new full account with email/phone...');
       
       // Generate secure random password
       const randomPassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
@@ -241,29 +236,7 @@ exports.handler = async (event) => {
       console.log('Created stub account and added to group:', stubUserId);
     }
 
-    // Create stub user
-    const stubUserId = uuidv4();
-    const now = new Date().toISOString();
-    
-    const newStubUser = {
-      userId: stubUserId,
-      firstName: firstName?.trim() || '',
-      lastName: lastName?.trim() || '',
-      phone: phone?.trim() || null,
-      // Note: email and password fields omitted for stub users to avoid GSI conflicts
-      isAdmin: false,
-      isStub: true,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    const putParams = {
-      TableName: USERS_TABLE,
-      Item: newStubUser,
-      ConditionExpression: 'attribute_not_exists(userId)'
-    };
-
-    await dynamodb.send(new PutCommand(putParams));
+    // User creation and group membership already handled above
 
     // Return success response with user data (without password)
     const { password: _, ...userResponse } = user;

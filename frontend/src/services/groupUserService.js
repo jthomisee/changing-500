@@ -24,7 +24,6 @@ export const listGroupUsers = async (groupId) => {
 // Create a new stub user in a group
 export const createStubUser = async (groupId, userData) => {
   try {
-    console.log('Calling createStubUser API:', { groupId, userData });
     
     const data = await apiCall(`/groups/${groupId}/stub-users`, {
       method: 'POST',

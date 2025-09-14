@@ -3,14 +3,21 @@ import { calculateSeasonStandings } from '../utils/gameUtils';
 import { sortStandings } from '../utils/sortUtils';
 import { DEFAULT_SORT, SORT_DIRECTIONS } from '../constants/config';
 
-export const useStandings = (games, users = []) => {
+export const useStandings = (games, users = [], isUsersLoading = false) => {
   const [sortField, setSortField] = useState(DEFAULT_SORT.field);
   const [sortDirection, setSortDirection] = useState(DEFAULT_SORT.direction);
 
+  // Determine if we should show loading state
+  const isLoading = isUsersLoading || (games.length > 0 && users.length === 0);
+
   // Calculate raw standings from games
   const standings = useMemo(() => {
+    // Don't calculate during loading to avoid showing "Unknown User" entries
+    if (isLoading) {
+      return [];
+    }
     return calculateSeasonStandings(games, users);
-  }, [games, users]);
+  }, [games, users, isLoading]);
 
   // Sort standings based on current sort settings
   const sortedStandings = useMemo(() => {
@@ -42,6 +49,7 @@ export const useStandings = (games, users = []) => {
     sortField,
     sortDirection,
     handleSort,
-    getSortIcon
+    getSortIcon,
+    isLoading
   };
 };

@@ -54,17 +54,11 @@ const PlayerInput = ({
         email: newPlayerForm.email.trim() || null,
         phone: newPlayerForm.phone.trim() || null
       };
-
-      console.log('Creating/finding player with data:', playerData);
       
       const result = await onAddStubUser(playerData);
 
-      console.log('Player creation/find result:', result);
-
       if (result.success) {
-        // Select the user by userId (whether found existing or newly created)
-        console.log('Auto-selecting user:', result.user.userId);
-        
+        // Select the user by userId (whether found existing or newly created)        
         onPlayerChange(index, 'userId', result.user.userId);
         
         // Reset form and close modal
