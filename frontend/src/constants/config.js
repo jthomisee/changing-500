@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://your-api-gateway-url.amazonaws.com';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://api.changing500.com';
 
 // Game Configuration
 // Points = Number of players you finished ahead of

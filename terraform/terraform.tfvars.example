@@ -1,4 +1,4 @@
 aws_region   = "us-east-1"
-project_name = "dealin-holden"
+project_name = "changing-500"
 environment  = "dev"
 domain_name  = ""

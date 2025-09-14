@@ -6,6 +6,7 @@ const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME;
+const USER_GROUPS_TABLE = process.env.USER_GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
   const headers = {
@@ -52,6 +53,42 @@ exports.handler = async (event) => {
           error: 'Game not found'
         })
       };
+    }
+
+    // Get the game to check its group before deletion
+    const game = existingGame.Item;
+    const groupId = game.groupId;
+
+    // Check if user has permission to delete games in this group
+    const userId = authResult.payload?.userId;
+    const isAdmin = authResult.payload?.isAdmin || false;
+
+    if (!isAdmin) {
+      // Check if user is an owner of the group
+      if (!groupId) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Game must belong to a group' 
+          })
+        };
+      }
+
+      const membershipResult = await dynamodb.send(new GetCommand({
+        TableName: USER_GROUPS_TABLE,
+        Key: { userId, groupId }
+      }));
+
+      if (!membershipResult.Item || membershipResult.Item.role !== 'owner') {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Only group owners can delete games for this group' 
+          })
+        };
+      }
     }
     
     // Delete the game

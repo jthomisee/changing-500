@@ -48,7 +48,7 @@ const verifyAuthHeader = async (authHeader) => {
   try {
     // Get JWT secret from Parameter Store
     const getParameterCommand = new GetParameterCommand({
-      Name: '/dealin-holden/jwt-secret',
+      Name: '/changing-500/jwt-secret',
       WithDecryption: true
     });
 

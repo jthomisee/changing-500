@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const initialResult = { 
-  player: '', 
+  userId: '',
   position: 1, 
   winnings: 0, 
   rebuys: 0, 

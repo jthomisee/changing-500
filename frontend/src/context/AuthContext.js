@@ -38,8 +38,11 @@ export const AuthProvider = ({ children }) => {
   // Authentication functions
   const handleUserRegister = async (userData) => {
     const { email, password, firstName, lastName, phone, isAdmin } = userData;
-    if (!email || !password || !firstName || !lastName) {
+    if (!password || !firstName || !lastName) {
       throw new Error('Please fill in all required fields');
+    }
+    if (!email && !phone) {
+      throw new Error('Please provide either an email address or phone number');
     }
 
     setLoading(true);
@@ -51,14 +54,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const handleUserLogin = async (email, password) => {
-    if (!email || !password) {
-      throw new Error('Please enter email and password');
+  const handleUserLogin = async (username, password) => {
+    if (!username || !password) {
+      throw new Error('Please enter username (email or phone) and password');
     }
 
     setLoading(true);
     try {
-      const result = await loginUserAPI(email, password);
+      const result = await loginUserAPI(username, password);
       if (result.success) {
         setCurrentUser(result.user);
         setUserToken(result.token);

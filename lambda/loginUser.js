@@ -54,41 +54,63 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { email, password } = JSON.parse(event.body || '{}');
+    const { username, password } = JSON.parse(event.body || '{}');
     
-    if (!email || !password) {
+    if (!username || !password) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: 'Email and password are required'
+          error: 'Username (email or phone) and password are required'
         })
       };
     }
 
-    // Find user by email
-    const userQuery = {
-      TableName: USERS_TABLE,
-      IndexName: 'email-index',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: {
-        ':email': email.toLowerCase()
-      }
-    };
-
-    const userResult = await dynamodb.send(new QueryCommand(userQuery));
+    let user = null;
     
-    if (userResult.Items.length === 0) {
+    // Determine if username is email or phone
+    const isEmail = username.includes('@');
+    
+    if (isEmail) {
+      // Find user by email
+      const emailQuery = {
+        TableName: USERS_TABLE,
+        IndexName: 'email-index',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: {
+          ':email': username.toLowerCase()
+        }
+      };
+      const emailResult = await dynamodb.send(new QueryCommand(emailQuery));
+      if (emailResult.Items.length > 0) {
+        user = emailResult.Items[0];
+      }
+    } else {
+      // Find user by phone
+      const normalizedPhone = username.replace(/\D/g, ''); // Remove non-digits
+      const phoneQuery = {
+        TableName: USERS_TABLE,
+        IndexName: 'phone-index',
+        KeyConditionExpression: 'phone = :phone',
+        ExpressionAttributeValues: {
+          ':phone': normalizedPhone
+        }
+      };
+      const phoneResult = await dynamodb.send(new QueryCommand(phoneQuery));
+      if (phoneResult.Items.length > 0) {
+        user = phoneResult.Items[0];
+      }
+    }
+    
+    if (!user) {
       return {
         statusCode: 401,
         headers,
         body: JSON.stringify({ 
-          error: 'Invalid email or password'
+          error: 'Invalid username or password'
         })
       };
     }
-
-    const user = userResult.Items[0];
 
     // Check if user is a stub account (no password set)
     if (user.isStub) {
@@ -96,7 +118,7 @@ exports.handler = async (event) => {
         statusCode: 401,
         headers,
         body: JSON.stringify({ 
-          error: 'This account needs to be activated. Please contact an admin or register with this email.'
+          error: 'This account needs to be activated. Please contact an admin.'
         })
       };
     }
@@ -108,14 +130,14 @@ exports.handler = async (event) => {
         statusCode: 401,
         headers,
         body: JSON.stringify({ 
-          error: 'Invalid email or password'
+          error: 'Invalid username or password'
         })
       };
     }
 
     // Get JWT secret
     const getParameterCommand = new GetParameterCommand({
-      Name: '/dealin-holden/jwt-secret',
+      Name: '/changing-500/jwt-secret',
       WithDecryption: true
     });
 
@@ -127,6 +149,7 @@ exports.handler = async (event) => {
       { 
         userId: user.userId,
         email: user.email,
+        phone: user.phone,
         role: 'user',
         isAdmin: user.isAdmin || false,
         timestamp: Date.now()

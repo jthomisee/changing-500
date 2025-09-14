@@ -1,55 +1,255 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, X } from 'lucide-react';
 
 const PlayerInput = ({ 
   result, 
   index, 
-  availableUsers, 
-  isAuthenticated,
+  groupUsers = [], 
+  allResults = [],
   onPlayerChange, 
-  onUserSearch 
+  onAddStubUser,
+  loading = false
 }) => {
-  const handleInputChange = async (e) => {
-    const value = e.target.value;
-    onPlayerChange(index, 'player', value);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [newPlayerForm, setNewPlayerForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: ''
+  });
+  const [creatingPlayer, setCreatingPlayer] = useState(false);
+
+  const handlePlayerSelect = (e) => {
+    const selectedUserId = e.target.value;
     
-    // Search users when typing (if authenticated)
-    if (isAuthenticated && value.length > 1) {
-      await onUserSearch(value);
-    } else {
-      onUserSearch(''); // Clear results
+    if (selectedUserId === 'add-new') {
+      setShowAddPlayer(true);
+      return;
+    }
+    
+    if (selectedUserId === '') {
+      onPlayerChange(index, 'userId', '');
+      return;
+    }
+
+    // Just store the userId - no need for player name
+    onPlayerChange(index, 'userId', selectedUserId);
+  };
+
+  const handleAddPlayerSubmit = async (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling to parent form
+    
+    if (!newPlayerForm.firstName.trim() && !newPlayerForm.lastName.trim()) {
+      alert('Please enter at least a first name or last name');
+      return;
+    }
+
+    setCreatingPlayer(true);
+    try {
+      const playerData = {
+        firstName: newPlayerForm.firstName.trim(),
+        lastName: newPlayerForm.lastName.trim(),
+        email: newPlayerForm.email.trim() || null,
+        phone: newPlayerForm.phone.trim() || null
+      };
+
+      console.log('Creating/finding player with data:', playerData);
+      
+      const result = await onAddStubUser(playerData);
+
+      console.log('Player creation/find result:', result);
+
+      if (result.success) {
+        // Select the user by userId (whether found existing or newly created)
+        console.log('Auto-selecting user:', result.user.userId);
+        
+        onPlayerChange(index, 'userId', result.user.userId);
+        
+        // Reset form and close modal
+        setNewPlayerForm({ firstName: '', lastName: '', email: '', phone: '' });
+        setShowAddPlayer(false);
+        
+        // Show success message based on what happened
+        if (result.isExistingUser) {
+          console.log('Successfully added existing user to game');
+        } else if (result.isFullAccount) {
+          console.log('Successfully created full account and added to game');
+        } else {
+          console.log('Successfully created guest account and added to game');
+        }
+      } else {
+        console.error('Failed to create/find player:', result.error);
+        alert('Failed to add player: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error creating/finding player:', error);
+      alert('Failed to add player: ' + error.message);
+    } finally {
+      setCreatingPlayer(false);
     }
   };
 
-  const handleUserSelect = (user) => {
-    onPlayerChange(index, 'player', user.displayName);
-    onUserSearch(''); // Clear results
+  const handleAddPlayerCancel = () => {
+    setNewPlayerForm({ firstName: '', lastName: '', email: '', phone: '' });
+    setShowAddPlayer(false);
   };
+
+  // Get current selected user ID
+  const currentUserId = result.userId || '';
+
+  // Get all selected user IDs from other results (excluding current index)
+  const selectedUserIds = allResults
+    .filter((_, resultIndex) => resultIndex !== index)
+    .map(r => r.userId)
+    .filter(Boolean);
+
+  // Filter out already selected users and sort alphabetically
+  const availableUsers = groupUsers
+    .filter(user => !selectedUserIds.includes(user.userId))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   return (
     <div className="relative">
-      <input
-        type="text"
-        value={result.player}
-        onChange={handleInputChange}
-        className="w-full border rounded px-2 py-1 text-sm"
-        placeholder={isAuthenticated ? "Type name or select user" : "Player name"}
+      <select
+        value={currentUserId}
+        onChange={handlePlayerSelect}
+        className="w-full border rounded px-4 py-3 text-base min-w-0"
         required
-      />
-      {/* User suggestions dropdown */}
-      {availableUsers.length > 0 && result.player.length > 1 && (
-        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b max-h-32 overflow-y-auto z-10">
-          {availableUsers.map((user) => (
-            <button
-              key={user.userId}
-              type="button"
-              onClick={() => handleUserSelect(user)}
-              className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-100 last:border-b-0"
-            >
-              <div className="font-medium">{user.displayName}</div>
-              {user.email && <div className="text-xs text-gray-500">{user.email}</div>}
-            </button>
-          ))}
-        </div>
+        disabled={loading}
+      >
+        <option value="">-- Select Player --</option>
+        {availableUsers.map((user) => (
+          <option key={user.userId} value={user.userId}>
+            {user.displayName}
+            {user.isStub && ' (Guest)'}
+          </option>
+        ))}
+        <option value="add-new">+ Add New Player</option>
+      </select>
+
+      {/* Add New Player Modal */}
+      {showAddPlayer && createPortal(
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={(e) => e.stopPropagation()} // Prevent any click events from bubbling
+        >
+          <div 
+            className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()} // Prevent modal content clicks from bubbling
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Add New Player</h3>
+              <button
+                type="button"
+                onClick={handleAddPlayerCancel}
+                disabled={creatingPlayer}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPlayerSubmit} onClick={(e) => e.stopPropagation()}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newPlayerForm.firstName}
+                    onChange={(e) => setNewPlayerForm({...newPlayerForm, firstName: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Enter first name"
+                    disabled={creatingPlayer}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newPlayerForm.lastName}
+                    onChange={(e) => setNewPlayerForm({...newPlayerForm, lastName: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Enter last name"
+                    disabled={creatingPlayer}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={newPlayerForm.email}
+                    onChange={(e) => setNewPlayerForm({...newPlayerForm, email: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Enter email address"
+                    disabled={creatingPlayer}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={newPlayerForm.phone}
+                    onChange={(e) => setNewPlayerForm({...newPlayerForm, phone: e.target.value})}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Enter phone number"
+                    disabled={creatingPlayer}
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Smart User Creation:</strong>
+                    <br />• If email/phone exists → adds existing user to group
+                    <br />• If email/phone provided → creates full account with random password  
+                    <br />• If neither provided → creates guest account
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end mt-6">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleAddPlayerCancel();
+                  }}
+                  disabled={creatingPlayer}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPlayer || (!newPlayerForm.firstName.trim() && !newPlayerForm.lastName.trim())}
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingPlayer ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  {creatingPlayer ? 'Creating...' : 'Create Player'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

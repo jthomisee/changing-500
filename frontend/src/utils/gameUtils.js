@@ -32,8 +32,14 @@ export const calculatePoints = (results, playerResult) => {
 };
 
 // Calculate season standings for all players
-export const calculateSeasonStandings = (games) => {
+export const calculateSeasonStandings = (games, users = []) => {
   const playerStats = {};
+
+  // Create a lookup map for users by ID
+  const userLookup = {};
+  users.forEach(user => {
+    userLookup[user.userId] = user;
+  });
 
   games.forEach(game => {
     // Calculate best hand pot for this game
@@ -43,11 +49,20 @@ export const calculateSeasonStandings = (games) => {
     const bestHandWinningsPerWinner = bestHandWinners.length > 0 ? bestHandPot / bestHandWinners.length : 0;
 
     game.results.forEach(result => {
-      const player = result.player;
+      // Use userId as the key instead of player name
+      const userId = result.userId;
+      const user = userLookup[userId];
       
-      if (!playerStats[player]) {
-        playerStats[player] = {
-          player,
+      // Skip if no userId or user not found
+      if (!userId || !user) {
+        console.warn('Game result missing userId or user not found:', result);
+        return;
+      }
+      
+      if (!playerStats[userId]) {
+        playerStats[userId] = {
+          userId,
+          user, // Store user reference for easy access
           games: 0,
           wins: 0,
           totalWinnings: 0,
@@ -61,7 +76,7 @@ export const calculateSeasonStandings = (games) => {
         };
       }
 
-      const stats = playerStats[player];
+      const stats = playerStats[userId];
       stats.games++;
       stats.totalWinnings += result.winnings;
       stats.totalBuyins += (20 + (result.rebuys * 20)); // $20 buyin + $20 per rebuy
@@ -74,7 +89,7 @@ export const calculateSeasonStandings = (games) => {
         points: calculatePoints(game.results, result)
       });
 
-      if (result.position === 1) {
+      if (result.position === 1 || result.position === 2) {
         stats.wins++;
       }
 
@@ -106,6 +121,8 @@ export const calculateSeasonStandings = (games) => {
 
     return {
       ...stats,
+      // Add display name for compatibility with existing UI
+      player: stats.user ? `${stats.user.firstName || ''} ${stats.user.lastName || ''}`.trim() || stats.user.email || 'Unknown' : 'Unknown User',
       winnings,
       totalBuyins,
       netWinnings,
@@ -132,7 +149,7 @@ const calculateStreak = (gameHistory) => {
   // Start from the most recent game and go backwards
   for (let i = sortedGames.length - 1; i >= 0; i--) {
     const game = sortedGames[i];
-    const isWin = game.position === 1;
+    const isWin = game.position === 1 || game.position === 2;
     
     if (currentStreak === 0) {
       // First game in streak
@@ -164,37 +181,32 @@ export const validateGameData = (gameData) => {
 
   if (gameData.results) {
     // Check for duplicate players
-    const playerNames = gameData.results.map(r => r.player.toLowerCase().trim());
-    const duplicates = playerNames.filter((name, index) => name && playerNames.indexOf(name) !== index);
+    const playerIds = gameData.results.map(r => r.userId);
+    const duplicates = playerIds.filter((id, index) => id && playerIds.indexOf(id) !== index);
     if (duplicates.length > 0) {
-      errors.push('Duplicate player names are not allowed');
+      errors.push('Duplicate players are not allowed');
     }
 
     // Validate individual results
     gameData.results.forEach((result, index) => {
-      if (!result.player?.trim()) {
-        errors.push(`Player name is required for position ${index + 1}`);
+      if (!result.userId?.trim()) {
+        errors.push(`Player selection is required for position ${index + 1}`);
       }
 
       if (!result.position || result.position < 1) {
-        errors.push(`Valid position is required for ${result.player || `player ${index + 1}`}`);
+        errors.push(`Valid position is required for player ${index + 1}`);
       }
 
       if (typeof result.winnings !== 'number') {
-        errors.push(`Winnings must be a number for ${result.player || `player ${index + 1}`}`);
+        errors.push(`Winnings must be a number for player ${index + 1}`);
       }
 
       if (typeof result.rebuys !== 'number' || result.rebuys < 0) {
-        errors.push(`Rebuys must be a non-negative number for ${result.player || `player ${index + 1}`}`);
+        errors.push(`Rebuys must be a non-negative number for player ${index + 1}`);
       }
     });
 
-    // Check for duplicate positions
-    const positions = gameData.results.map(r => r.position).filter(p => p);
-    const duplicatePositions = positions.filter((pos, index) => positions.indexOf(pos) !== index);
-    if (duplicatePositions.length > 0) {
-      errors.push('Duplicate positions are not allowed');
-    }
+    // Note: Duplicate positions are allowed for ties
 
     // Validate best hand logic
     const bestHandWinners = gameData.results.filter(r => r.bestHandWinner);
@@ -206,7 +218,7 @@ export const validateGameData = (gameData) => {
 
     bestHandWinners.forEach(winner => {
       if (!winner.bestHandParticipant) {
-        errors.push(`${winner.player} won best hand but is not marked as participant`);
+        errors.push(`Player won best hand but is not marked as participant`);
       }
     });
   }

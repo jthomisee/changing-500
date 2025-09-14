@@ -6,6 +6,7 @@ const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME;
+const USER_GROUPS_TABLE = process.env.USER_GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
   const headers = {
@@ -54,6 +55,42 @@ exports.handler = async (event) => {
         })
       };
     }
+
+    // Get the current game to check its group
+    const currentGame = existingGame.Item;
+    const groupId = gameData.groupId || currentGame.groupId;
+
+    // Check if user has permission to edit games in this group
+    const userId = authResult.payload?.userId;
+    const isAdmin = authResult.payload?.isAdmin || false;
+
+    if (!isAdmin) {
+      // Check if user is an owner of the group
+      if (!groupId) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Game must belong to a group' 
+          })
+        };
+      }
+
+      const membershipResult = await dynamodb.send(new GetCommand({
+        TableName: USER_GROUPS_TABLE,
+        Key: { userId, groupId }
+      }));
+
+      if (!membershipResult.Item || membershipResult.Item.role !== 'owner') {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Only group owners can edit games for this group' 
+          })
+        };
+      }
+    }
     
     // Process results to add rebuys and detect ties
     const processedResults = gameData.results.map(result => ({
@@ -84,7 +121,7 @@ exports.handler = async (event) => {
     const updateParams = {
       TableName: TABLE_NAME,
       Key: { id: gameId },
-      UpdateExpression: 'SET #date = :date, gameNumber = :gameNumber, results = :results, updatedAt = :updatedAt',
+      UpdateExpression: 'SET #date = :date, gameNumber = :gameNumber, results = :results, groupId = :groupId, updatedAt = :updatedAt, updatedBy = :updatedBy',
       ExpressionAttributeNames: {
         '#date': 'date' // 'date' is a reserved word in DynamoDB
       },
@@ -92,7 +129,9 @@ exports.handler = async (event) => {
         ':date': gameData.date,
         ':gameNumber': gameData.gameNumber,
         ':results': resultsWithTies,
-        ':updatedAt': new Date().toISOString()
+        ':groupId': groupId,
+        ':updatedAt': new Date().toISOString(),
+        ':updatedBy': userId
       },
       ReturnValues: 'ALL_NEW'
     };

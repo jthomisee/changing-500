@@ -5,6 +5,7 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
   const [formData, setFormData] = useState({
     email: '',
+    username: '', // Used for login - can be email or phone
     password: '',
     confirmPassword: '',
     firstName: '',
@@ -15,6 +16,7 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
   const resetForm = () => {
     setFormData({
       email: '',
+      username: '',
       password: '',
       confirmPassword: '',
       firstName: '',
@@ -94,14 +96,38 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
             </div>
           )}
           
-          <input
-            type="email"
-            placeholder="Email Address *"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={loading}
-          />
+          {authMode === 'login' ? (
+            <input
+              type="text"
+              placeholder="Email or Phone Number *"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+            />
+          ) : (
+            <>
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+              />
+              <input
+                type="tel"
+                placeholder="Phone Number"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-600">
+                * At least one of email or phone number is required
+              </p>
+            </>
+          )}
           
               <input
                 type="password"
@@ -114,25 +140,15 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
               />
               
               {authMode === 'register' && (
-                <>
-                  <input
-                    type="password"
-                    placeholder="Confirm Password *"
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    onKeyPress={handleKeyPress}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={loading}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Phone Number (optional)"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={loading}
-                  />
-                </>
+                <input
+                  type="password"
+                  placeholder="Confirm Password *"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onKeyPress={handleKeyPress}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={loading}
+                />
               )}
         </div>
 

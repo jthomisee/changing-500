@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Trophy, Plus, DollarSign, Calendar, Users, TrendingUp, Edit, Trash2, X, Save, Settings } from 'lucide-react';
+import { Trophy, Plus, DollarSign, Calendar, Users, TrendingUp, Edit, Trash2, X, Save, Settings, ChevronDown, Loader } from 'lucide-react';
 
 // Context and Hooks
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useGames } from './hooks/useGames';
 import { useStandings } from './hooks/useStandings';
 import { useGameForm } from './hooks/useGameForm';
-import { useUsers } from './hooks/useUsers';
+import { useGroups } from './hooks/useGroups';
+import { useGroupUsers } from './hooks/useGroupUsers';
 
 // Components
 import AuthButtons from './components/auth/AuthButtons';
@@ -16,6 +17,9 @@ import SortableHeader from './components/common/SortableHeader';
 import PlayerInput from './components/games/PlayerInput';
 import UserManagement from './components/admin/UserManagement';
 import UserProfile from './components/user/UserProfile';
+import UserDropdown from './components/user/UserDropdown';
+import GroupManagement from './components/groups/GroupManagement';
+import GroupSelector from './components/groups/GroupSelector';
 
 // Utils
 import { calculatePoints } from './utils/gameUtils';
@@ -24,16 +28,16 @@ import { calculatePoints } from './utils/gameUtils';
 import './App.css';
 
 // Main App Component (wrapped with AuthProvider)
-const DealinHoldenApp = () => {
+const Changing500App = () => {
   return (
     <AuthProvider>
-      <DealinHolden />
+      <Changing500 />
     </AuthProvider>
   );
 };
 
 // Core App Component
-const DealinHolden = () => {
+const Changing500 = () => {
   // Authentication
   const { 
     isAdmin, 
@@ -56,14 +60,34 @@ const DealinHolden = () => {
     deleteGame
   } = useGames();
 
+  // Groups Management (must come first to define selectedGroup)  
+  const { groups, selectedGroup, loadingGroups, groupError, selectGroup, createNewGroup } = useGroups();
+
+  // Group Users (must come before it's used in getUserDisplayName and useStandings)
+  const {
+    groupUsers,
+    loading: groupUsersLoading,
+    addStubUser
+  } = useGroupUsers(selectedGroup?.groupId);
+
   // Standings
+  // Filter games by selected group
+  const filteredGames = selectedGroup 
+    ? games.filter(game => game.groupId === selectedGroup.groupId)
+    : [];
+  
+  // Helper function to get user display name from userId
+  const getUserDisplayName = (userId) => {
+    const user = groupUsers.find(u => u.userId === userId);
+    return user ? user.displayName : 'Unknown User';
+  };
+
   const {
     standings,
     sortField,
     sortDirection,
-    handleSort,
-    getSortIcon
-  } = useStandings(games);
+    handleSort
+  } = useStandings(filteredGames, groupUsers);
 
   // Game Form
   const {
@@ -72,7 +96,7 @@ const DealinHolden = () => {
     newGame,
     openAddGame,
     startEditingGame,
-    closeForm,
+    closeForm: originalCloseForm,
     updateGameData,
     addPlayerToGame,
     removePlayerFromGame,
@@ -80,16 +104,24 @@ const DealinHolden = () => {
     isEditing
   } = useGameForm();
 
-  // User Search
-  const {
-    availableUsers,
-    searchForUsers,
-    clearUsers
-  } = useUsers();
+  // Local closeForm wrapper that also clears errors
+  const closeForm = () => {
+    setGameFormError(''); // Clear form errors
+    originalCloseForm();
+  };
+
+  // User Search (legacy - kept for backward compatibility but unused)
+  // const { availableUsers, searchForUsers, clearUsers } = useUsers();
+
+  // Group Users moved above to avoid initialization errors
+
+  // Groups Management (moved above to avoid initialization error)
 
   // Local state for modals and views
   const [showUserAuth, setShowUserAuth] = useState(false);
-  const [activeView, setActiveView] = useState('games'); // 'games', 'users', or 'profile'
+  const [activeView, setActiveView] = useState('games'); // 'games', 'users', 'profile', or 'groups'
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [gameFormError, setGameFormError] = useState('');
 
   // Load games on mount
   useEffect(() => {
@@ -101,8 +133,13 @@ const DealinHolden = () => {
     try {
       if (mode === 'register') {
         const { email, password, confirmPassword, firstName, lastName, phone } = formData;
-        if (!email || !password || !firstName || !lastName) {
+        if (!password || !firstName || !lastName) {
           alert('Please fill in all required fields');
+          return;
+        }
+
+        if (!email && !phone) {
+          alert('Please provide either an email address or phone number');
           return;
         }
 
@@ -119,34 +156,34 @@ const DealinHolden = () => {
         const result = await handleUserRegister({ email, password, firstName, lastName, phone });
 
         if (result.success) {
-          // Auto-login after successful registration
-          const loginResult = await handleUserLogin(email, password);
+          // Auto-login after successful registration using email or phone
+          const username = email || phone;
+          const loginResult = await handleUserLogin(username, password);
           if (loginResult.success) {
             setShowUserAuth(false);
             // Reload data to show user's games
             loadAllGames();
-            alert('Registration successful! You are now logged in.');
             return;
-          } else {
+      } else {
             alert('Registration successful! Please login manually.');
             return;
           }
-        } else {
+    } else {
           alert(`Registration failed: ${result.error}`);
         }
-      } else {
-        const { email, password } = formData;
-        if (!email || !password) {
-          alert('Please enter email and password');
+    } else {
+        const { username, password } = formData;
+        if (!username || !password) {
+          alert('Please enter username (email or phone) and password');
           return;
         }
 
-        const result = await handleUserLogin(email, password);
+        const result = await handleUserLogin(username, password);
 
         if (result.success) {
           setShowUserAuth(false);
           return;
-        } else {
+      } else {
           alert(`Login failed: ${result.error}`);
         }
       }
@@ -160,92 +197,118 @@ const DealinHolden = () => {
   // Game form handlers
   const handleSaveGame = async (e) => {
     e.preventDefault();
+    setGameFormError(''); // Clear any previous errors
+    
+    // Check if a group is selected
+    if (!selectedGroup) {
+      setGameFormError('Please select a group first');
+      return;
+    }
     
     try {
+      // Include groupId in the game data
+      const gameDataWithGroup = {
+        ...newGame,
+        groupId: selectedGroup.groupId
+      };
+      
       if (isEditing) {
-        await updateGame(editingGame.id, newGame);
+        await updateGame(editingGame.id, gameDataWithGroup);
       } else {
-        await saveGame(newGame);
+        await saveGame(gameDataWithGroup);
       }
       closeForm();
     } catch (error) {
-      setGamesError('Failed to save game: ' + error.message);
+      setGameFormError('Failed to save game: ' + error.message);
     }
   };
 
-  return (
+  // Group creation handler
+  const handleCreateGroup = async (groupData) => {
+    try {
+      const result = await createNewGroup(groupData);
+      if (result.success) {
+        setShowCreateGroup(false);
+        return { success: true };
+      }
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+    };
+
+    return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-3">
-            <Trophy className="w-10 h-10 text-yellow-500" />
-            Dealin Holden
-          </h1>
-          <p className="text-gray-600">Track games, winnings, and season standings</p>
-          
-          {/* Authentication */}
-          <div className="flex justify-center items-center gap-4 mt-4">
-            <AuthButtons
-              currentUser={currentUser}
-              isAdmin={isAdmin}
-              onUserLogout={handleUserLogout}
-              onShowUserAuth={() => setShowUserAuth(true)}
-            />
-          </div>
-
-          {/* Navigation */}
-          {currentUser && (
-            <div className="flex justify-center items-center gap-2 mt-4">
-              <button
-                onClick={() => setActiveView('games')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeView === 'games'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <Calendar className="w-4 h-4 inline mr-2" />
-                Games
-              </button>
-              <button
-                onClick={() => setActiveView('profile')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeView === 'profile'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <Users className="w-4 h-4 inline mr-2" />
-                My Profile
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setActiveView('users')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    activeView === 'users'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <Settings className="w-4 h-4 inline mr-2" />
-                  User Management
-                </button>
+        <div className="mb-8">
+          {/* Top Header Bar */}
+          <div className="flex items-center justify-between mb-4">
+            {/* Left: App Title */}
+            <button 
+              onClick={() => setActiveView('games')}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+            >
+              <Trophy className="w-10 h-10 text-yellow-500" />
+              <h1 className="text-4xl font-bold text-gray-800">Changing 500</h1>
+            </button>
+            
+            {/* Right: User Actions */}
+            <div className="flex items-center gap-3">
+              {currentUser && (
+                <GroupSelector
+                  groups={groups}
+                  selectedGroup={selectedGroup}
+                  onSelectGroup={selectGroup}
+                  onCreateGroup={() => setShowCreateGroup(true)}
+                  loading={loadingGroups}
+                  error={groupError}
+                  isAdmin={isAdmin}
+                />
               )}
+              
+              {currentUser ? (
+                <UserDropdown 
+                  onProfileClick={() => setActiveView('profile')} 
+                  onUserManagementClick={() => setActiveView('users')}
+                  onGroupMembersClick={() => setActiveView('groups')}
+                  selectedGroup={selectedGroup}
+                />
+              ) : (
+                <AuthButtons 
+                  onShowUserAuth={() => setShowUserAuth(true)}
+                />
+              )}
+            </div>
+          </div>
+          
+          {currentUser && groups.length === 0 && !loadingGroups && (
+            <div className="mt-6 max-w-md mx-auto text-center">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-yellow-800 mb-4">
+                  You're not a member of any groups yet.
+                </p>
+                <button
+                  onClick={() => setShowCreateGroup(true)}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+                >
+                  Create Your First Group
+                </button>
+              </div>
             </div>
           )}
           
           {/* Status indicators */}
-          <div className="flex justify-center items-center gap-4 mt-4">           
+          <div className="flex justify-center items-center gap-4 mt-4">
             {gamesError && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
                 {gamesError}
-                <button 
+            <button
                   onClick={() => setGamesError('')}
                   className="ml-2 text-red-500 hover:text-red-700"
-                >
+            >
                   <X className="w-4 h-4 inline" />
-                </button>
+            </button>
               </div>
             )}
           </div>
@@ -255,15 +318,25 @@ const DealinHolden = () => {
         {activeView === 'profile' && (
           <div className="mb-8">
             <UserProfile />
-          </div>
-        )}
-
+              </div>
+            )}
+            
         {/* Admin User Management View */}
         {isAdmin && activeView === 'users' && (
           <div className="mb-8">
             <UserManagement />
-          </div>
-        )}
+              </div>
+            )}
+            
+        {/* Group Management View */}
+        {(selectedGroup?.userRole === 'owner' || isAdmin) && activeView === 'groups' && (
+          <div className="mb-8">
+            <GroupManagement 
+              selectedGroup={selectedGroup}
+              onClose={() => setActiveView('games')}
+            />
+              </div>
+            )}
 
         {/* Games View */}
         {activeView === 'games' && (
@@ -284,14 +357,14 @@ const DealinHolden = () => {
             <Plus className="w-5 h-5" />
             Add New Game
           </LoadingButton>
-        </div>
+          </div>
 
-        {/* Season Standings */}
+        {/* Group Leaderboard */}
         <div className="bg-white rounded-lg shadow-lg mb-8">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-4">
               <TrendingUp className="w-6 h-6 text-blue-600" />
-              <h2 className="text-2xl font-semibold text-gray-800">Season Standings</h2>
+              <h2 className="text-2xl font-semibold text-gray-800">Group Leaderboard</h2>
             </div>
           </div>
           
@@ -412,8 +485,8 @@ const DealinHolden = () => {
                         <div className="flex items-center gap-1">
                           {player.rank === 1 && <Trophy className="w-4 h-4 text-yellow-600" />}
                           {player.rank}
-                        </div>
-                      </td>
+                      </div>
+                    </td>
                       <td className={`px-4 py-3 text-left font-medium sticky left-12 z-10 shadow-sm border-r ${getStickyBgClass()}`}>
                         <div className="flex items-center gap-1">
                           {player.rank === 1 && <Trophy className="w-4 h-4 text-yellow-600" />}
@@ -427,7 +500,7 @@ const DealinHolden = () => {
                       {player.games}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {player.winRate.toFixed(1)}%
+                        {player.winRate.toFixed(1)}%
                       <div className="text-xs text-gray-500">
                         {player.wins}W - {player.games - player.wins}L
                       </div>
@@ -443,7 +516,7 @@ const DealinHolden = () => {
                       ) : player.streakType === 'loss' ? (
                         <span className="text-red-600 font-semibold">
                           L{player.currentStreak}
-                        </span>
+                      </span>
                       ) : (
                         <span className="text-gray-500">-</span>
                       )}
@@ -463,8 +536,8 @@ const DealinHolden = () => {
                       player.netWinnings >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
                       ${player.netWinnings.toFixed(2)}
-                      </td>
-                    </tr>
+                    </td>
+                  </tr>
                   );
                 })}
               </tbody>
@@ -477,17 +550,31 @@ const DealinHolden = () => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <Calendar className="w-6 h-6 text-green-600" />
-              <h2 className="text-2xl font-semibold text-gray-800">Recent Games</h2>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Recent Games {selectedGroup ? `- ${selectedGroup.name}` : ''}
+              </h2>
             </div>
           </div>
           
           <div className="divide-y divide-gray-200">
-            {games.slice().reverse().map((game) => (
-              <div key={game.id} className="p-6">
+            {!selectedGroup ? (
+              <div className="p-6 text-center">
+                <p className="text-gray-500">Select a group to view games</p>
+              </div>
+            ) : filteredGames.length === 0 ? (
+              <div className="p-6 text-center">
+                <p className="text-gray-500">No games recorded yet for {selectedGroup.name}</p>
+                {currentUser && (
+                  <p className="text-sm text-gray-400 mt-2">Add your first game to get started!</p>
+                )}
+              </div>
+            ) : (
+              filteredGames.slice().reverse().map((game) => (
+                <div key={game.id} className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-semibold text-lg">Game #{game.gameNumber}</h3>
-                    <p className="text-gray-600">{game.date}</p>
+                    <h3 className="font-semibold text-lg">{game.date}</h3>
+                    <p className="text-gray-600">Game #{game.gameNumber}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -500,7 +587,7 @@ const DealinHolden = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+          <button
                       onClick={() => isAuthenticated && startEditingGame(game)}
                       className={`p-2 rounded-lg ${
                         isAuthenticated 
@@ -511,8 +598,8 @@ const DealinHolden = () => {
                       title={isAuthenticated ? "Edit game" : "Please login to edit games"}
                     >
                       <Edit className="w-4 h-4" />
-                    </button>
-                    <button
+          </button>
+                <button
                       onClick={() => isAuthenticated && deleteGame(game.id)}
                       className={`p-2 rounded-lg ${
                         isAuthenticated 
@@ -523,7 +610,7 @@ const DealinHolden = () => {
                       title={isAuthenticated ? "Delete game" : "Please login to delete games"}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                </button>
                   </div>
                 </div>
                 
@@ -560,7 +647,7 @@ const DealinHolden = () => {
                                     #{result.position}
                                   </div>
                                 </td>
-                                <td className="py-2 px-3 font-medium">{result.player}</td>
+                                <td className="py-2 px-3 font-medium">{getUserDisplayName(result.userId)}</td>
                                 <td className="py-2 px-3 text-center text-blue-600 font-semibold">
                                   {points.toFixed(1)}
                                 </td>
@@ -589,10 +676,11 @@ const DealinHolden = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
-        </div>
-      
+            </div>
+            
       {/* Game Form Modal */}
       {showAddGame && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -601,113 +689,123 @@ const DealinHolden = () => {
               {isEditing ? 'Edit Game' : 'Add New Game'}
             </h3>
             
+            {/* Modal Error Display */}
+            {gameFormError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {gameFormError}
+              </div>
+            )}
+            
             <form onSubmit={handleSaveGame}>
               {/* Basic game info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
+            <div className="space-y-4 mb-6">
+              <div>
                   <label className="block text-sm font-medium mb-2">Date *</label>
-                  <input
-                    type="date"
+                <input
+                  type="date"
                     value={newGame.date}
                     onChange={(e) => updateGameData('date', e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    required
-                  />
-                </div>
-                <div>
+                    className="w-full max-w-md border rounded px-4 py-3 text-base"
+                  required
+                />
+              </div>
+              <div>
                   <label className="block text-sm font-medium mb-2">Game Number</label>
-                  <input
-                    type="number"
+                <input
+                  type="number"
                     value={newGame.gameNumber}
                     onChange={(e) => updateGameData('gameNumber', parseInt(e.target.value) || 1)}
-                    className="w-full border rounded px-3 py-2"
-                    min="1"
-                  />
-                </div>
+                    className="w-full max-w-xs border rounded px-4 py-3 text-base"
+                  min="1"
+                />
               </div>
+            </div>
 
               {/* Players */}
-              <h4 className="font-semibold mb-3">Players & Results</h4>
+            <h4 className="font-semibold mb-3">Players & Results</h4>
               {newGame.results.map((result, index) => (
-                <div key={index} className="grid grid-cols-1 lg:grid-cols-6 gap-2 mb-3 p-3 bg-gray-50 rounded">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Player *</label>
+                <div key={index} className="space-y-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Player *</label>
                     <PlayerInput
                       result={result}
                       index={index}
-                      availableUsers={availableUsers}
-                      isAuthenticated={isAuthenticated}
+                      groupUsers={groupUsers}
+                      allResults={newGame.results}
                       onPlayerChange={updatePlayerResult}
-                      onUserSearch={searchForUsers}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Position</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={result.position}
-                      onChange={(e) => updatePlayerResult(index, 'position', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Winnings ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={result.winnings}
-                      onChange={(e) => updatePlayerResult(index, 'winnings', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Rebuys</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={result.rebuys}
-                      onChange={(e) => updatePlayerResult(index, 'rebuys', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Best Hand</label>
-                    <div className="space-y-1">
-                      <label className="flex items-center text-xs">
-                        <input
-                          type="checkbox"
-                          checked={result.bestHandParticipant}
-                          onChange={(e) => updatePlayerResult(index, 'bestHandParticipant', e.target.checked)}
-                          className="mr-1"
-                        />
-                        Participated
-                      </label>
-                      <label className="flex items-center text-xs">
-                        <input
-                          type="checkbox"
-                          checked={result.bestHandWinner}
-                          onChange={(e) => updatePlayerResult(index, 'bestHandWinner', e.target.checked)}
-                          className="mr-1"
-                        />
-                        Won
-                      </label>
+                      onAddStubUser={addStubUser}
+                      loading={groupUsersLoading}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div>
+                    <label className="block text-sm font-medium mb-2">Position</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={result.position}
+                    onChange={(e) => updatePlayerResult(index, 'position', e.target.value)}
+                      className="w-full border rounded px-3 py-2 text-base"
+                        required
+                  />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-2">Winnings ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={result.winnings}
+                    onChange={(e) => updatePlayerResult(index, 'winnings', e.target.value)}
+                      className="w-full border rounded px-3 py-2 text-base"
+                  />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-2">Rebuys</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={result.rebuys}
+                    onChange={(e) => updatePlayerResult(index, 'rebuys', e.target.value)}
+                      className="w-full border rounded px-3 py-2 text-base"
+                  />
+                </div>
+                <div>
+                      <label className="block text-sm font-medium mb-2">Best Hand</label>
+                      <div className="space-y-2">
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="checkbox"
+                            checked={result.bestHandParticipant}
+                            onChange={(e) => updatePlayerResult(index, 'bestHandParticipant', e.target.checked)}
+                            className="mr-2"
+                          />
+                          Participated
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="checkbox"
+                            checked={result.bestHandWinner}
+                            onChange={(e) => updatePlayerResult(index, 'bestHandWinner', e.target.checked)}
+                            className="mr-2"
+                          />
+                          Won
+                        </label>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    {newGame.results.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removePlayerFromGame(index)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <div className="flex items-end">
+                      {newGame.results.length > 1 && (
+                  <button
+                          type="button"
+                          onClick={() => removePlayerFromGame(index)}
+                          className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded"
+                  >
+                    Remove
+                  </button>
+                      )}
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
 
               <button
                 type="button"
@@ -718,14 +816,14 @@ const DealinHolden = () => {
               </button>
 
               {/* Form buttons */}
-              <div className="flex gap-2 justify-end">
-                <button
+            <div className="flex gap-2 justify-end">
+              <button
                   type="button"
                   onClick={closeForm}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
                 <LoadingButton
                   loading={gamesLoading}
                   className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
@@ -733,10 +831,10 @@ const DealinHolden = () => {
                   <Save className="w-4 h-4" />
                   {isEditing ? 'Update Game' : 'Save Game'}
                 </LoadingButton>
-              </div>
+            </div>
             </form>
+            </div>
           </div>
-        </div>
       )}
       </>
     )}
@@ -748,9 +846,129 @@ const DealinHolden = () => {
           loading={authLoading}
           onSubmit={handleUserAuthSubmit}
         />
-      </div>
-    </div>
+
+        {/* Create Group Modal */}
+        {showCreateGroup && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Create New Group</h3>
+                      <button
+                  onClick={() => setShowCreateGroup(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                      </button>
+                  </div>
+                  
+              <CreateGroupForm 
+                onSubmit={handleCreateGroup}
+                onCancel={() => setShowCreateGroup(false)}
+              />
+                              </div>
+                              </div>
+        )}
+                            </div>
+                              </div>
   );
 };
 
-export default DealinHoldenApp;
+// Create Group Form Component
+const CreateGroupForm = ({ onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      setError('Group name is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await onSubmit(formData);
+      if (result.success) {
+        setFormData({ name: '', description: '' });
+      } else {
+        setError(result.error || 'Failed to create group');
+      }
+    } catch (err) {
+      setError('Failed to create group');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Group Name *
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter group name"
+            disabled={loading}
+          />
+                            </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description (Optional)
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Describe your group"
+            rows="3"
+            disabled={loading}
+          />
+                          </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+                        </div>
+          )}
+      </div>
+
+      <div className="flex gap-3 justify-end mt-6">
+              <button
+          type="button"
+          onClick={onCancel}
+                disabled={loading}
+          className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+          type="submit"
+          disabled={loading || !formData.name.trim()}
+          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <Loader className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4" />
+          )}
+          {loading ? 'Creating...' : 'Create Group'}
+              </button>
+            </div>
+    </form>
+  );
+};
+
+export default Changing500App;

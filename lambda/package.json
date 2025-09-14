@@ -1,5 +1,5 @@
 {
-  "name": "dealin-holden-api",
+  "name": "changing-500-api",
   "version": "1.0.0",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",

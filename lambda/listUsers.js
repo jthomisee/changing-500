@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { verifyAuthHeader } = require('./verifyJWT');
 
 const client = new DynamoDBClient({});
@@ -49,9 +49,19 @@ exports.handler = async (event) => {
     const { limit = '50', lastEvaluatedKey, search } = event.queryStringParameters || {};
 
     let scanParams = {
-      TableName: USERS_TABLE,
-      Limit: parseInt(limit)
+      TableName: USERS_TABLE
     };
+
+    // For filtered scans, we need a higher internal limit since DynamoDB's Limit 
+    // applies BEFORE filtering. We'll slice the results afterward.
+    const requestedLimit = parseInt(limit);
+    if (search) {
+      // Use higher scan limit when filtering to ensure we find matches
+      scanParams.Limit = Math.max(requestedLimit * 10, 100);
+    } else {
+      // For non-filtered scans, use the requested limit directly
+      scanParams.Limit = requestedLimit;
+    }
 
     // Add pagination
     if (lastEvaluatedKey) {
@@ -62,27 +72,129 @@ exports.handler = async (event) => {
       }
     }
 
-    // Add search filter if provided
+    // Handle search - use Query for exact email/phone searches, Scan for partial name searches
     if (search) {
       const searchTerm = search.toLowerCase();
-      scanParams.FilterExpression = 'contains(#firstName, :search) OR contains(#lastName, :search) OR contains(#email, :search)';
-      scanParams.ExpressionAttributeNames = {
+      const normalizedPhone = search.replace(/\D/g, ''); // Remove non-digits for phone search
+      
+      // Check if this is an exact email search
+      const isEmailSearch = searchTerm.includes('@') && searchTerm.includes('.');
+      const isPhoneSearch = normalizedPhone.length >= 10; // Full phone number
+      
+      let users = [];
+      
+      // Try exact email search first using Query (much more efficient)
+      if (isEmailSearch) {
+        try {
+          const emailQuery = {
+            TableName: USERS_TABLE,
+            IndexName: 'email-index',
+            KeyConditionExpression: 'email = :email',
+            ExpressionAttributeValues: {
+              ':email': searchTerm
+            },
+            Limit: requestedLimit
+          };
+          
+          const emailResult = await dynamodb.send(new QueryCommand(emailQuery));
+          if (emailResult.Items.length > 0) {
+            // Found exact email match, return it
+            users = emailResult.Items.map(user => {
+              const { password, ...userWithoutPassword } = user;
+              return userWithoutPassword;
+            });
+            
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                users,
+                count: users.length,
+                totalScanned: 1 // Only queried one specific record
+              })
+            };
+          }
+        } catch (error) {
+          console.error('Email query failed, falling back to scan:', error);
+        }
+      }
+      
+      // Try exact phone search using Query (much more efficient)
+      if (isPhoneSearch && users.length === 0) {
+        try {
+          const phoneQuery = {
+            TableName: USERS_TABLE,
+            IndexName: 'phone-index',
+            KeyConditionExpression: 'phone = :phone',
+            ExpressionAttributeValues: {
+              ':phone': normalizedPhone
+            },
+            Limit: requestedLimit
+          };
+          
+          const phoneResult = await dynamodb.send(new QueryCommand(phoneQuery));
+          if (phoneResult.Items.length > 0) {
+            // Found exact phone match, return it
+            users = phoneResult.Items.map(user => {
+              const { password, ...userWithoutPassword } = user;
+              return userWithoutPassword;
+            });
+            
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                users,
+                count: users.length,
+                totalScanned: 1 // Only queried one specific record
+              })
+            };
+          }
+        } catch (error) {
+          console.error('Phone query failed, falling back to scan:', error);
+        }
+      }
+      
+      // If no exact matches found, fall back to Scan for partial name searches
+      let filterExpression = 'contains(#firstName, :search) OR contains(#lastName, :search)';
+      const expressionAttributeNames = {
         '#firstName': 'firstName',
-        '#lastName': 'lastName',
-        '#email': 'email'
+        '#lastName': 'lastName'
       };
-      scanParams.ExpressionAttributeValues = {
+      const expressionAttributeValues = {
         ':search': searchTerm
       };
+
+      // Add partial email search for non-email-like searches
+      if (!isEmailSearch) {
+        filterExpression += ' OR (attribute_exists(#email) AND contains(#email, :search))';
+        expressionAttributeNames['#email'] = 'email';
+      }
+
+      // Add partial phone search for shorter phone numbers
+      if (normalizedPhone.length >= 3 && !isPhoneSearch) {
+        filterExpression += ' OR (attribute_exists(#phone) AND contains(#phone, :phone))';
+        expressionAttributeNames['#phone'] = 'phone';
+        expressionAttributeValues[':phone'] = normalizedPhone;
+      }
+
+      scanParams.FilterExpression = filterExpression;
+      scanParams.ExpressionAttributeNames = expressionAttributeNames;
+      scanParams.ExpressionAttributeValues = expressionAttributeValues;
     }
 
     const result = await dynamodb.send(new ScanCommand(scanParams));
     
     // Remove passwords from response
-    const users = result.Items.map(user => {
+    let users = result.Items.map(user => {
       const { password, ...userWithoutPassword } = user;
       return userWithoutPassword;
     });
+
+    // If we used a higher scan limit for filtering, slice results to requested limit
+    if (search && users.length > requestedLimit) {
+      users = users.slice(0, requestedLimit);
+    }
 
     const response = {
       users,

@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const { v4: uuidv4 } = require('uuid');
 const { verifyAuthHeader } = require('./verifyJWT');
 
@@ -7,6 +7,7 @@ const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME;
+const USER_GROUPS_TABLE = process.env.USER_GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
   const headers = {
@@ -37,6 +38,37 @@ exports.handler = async (event) => {
 
   try {
     const gameData = JSON.parse(event.body);
+    
+    // Validate required fields including groupId
+    if (!gameData.groupId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Group ID is required' })
+      };
+    }
+
+    // Check if user has permission to create games in this group
+    const userId = authResult.payload?.userId;
+    const isAdmin = authResult.payload?.isAdmin || false;
+
+    if (!isAdmin) {
+      // Check if user is an owner of the group
+      const membershipResult = await dynamodb.send(new GetCommand({
+        TableName: USER_GROUPS_TABLE,
+        Key: { userId, groupId: gameData.groupId }
+      }));
+
+      if (!membershipResult.Item || membershipResult.Item.role !== 'owner') {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Only group owners can create games for this group' 
+          })
+        };
+      }
+    }
     
     // Process results to add rebuys and detect ties
     const processedResults = gameData.results.map(result => ({

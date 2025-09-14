@@ -31,45 +31,93 @@ exports.handler = async (event) => {
     const { email, password, firstName, lastName, phone, isAdmin = false } = JSON.parse(event.body || '{}');
     
     // Validate required fields
-    if (!email || !password || !firstName || !lastName) {
+    if (!password || !firstName || !lastName) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: 'Email, password, first name, and last name are required'
+          error: 'Password, first name, and last name are required'
         })
       };
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Require at least one of email or phone
+    if (!email && !phone) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: 'Invalid email format'
+          error: 'Either email or phone number is required'
         })
       };
     }
 
-    // Check if user already exists
-    const existingUserQuery = {
-      TableName: USERS_TABLE,
-      IndexName: 'email-index',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: {
-        ':email': email.toLowerCase()
+    // Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Invalid email format'
+          })
+        };
       }
-    };
+    }
 
-    const existingUser = await dynamodb.send(new QueryCommand(existingUserQuery));
-    if (existingUser.Items.length > 0) {
+    // Validate phone format if provided
+    if (phone) {
+      const phoneRegex = /^\+?[\d\s\-\(\)\.]{10,}$/;
+      if (!phoneRegex.test(phone)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Invalid phone format'
+          })
+        };
+      }
+    }
+
+    // Check if user already exists by email or phone
+    const existingUsers = [];
+
+    // Check by email if provided
+    if (email) {
+      const emailQuery = {
+        TableName: USERS_TABLE,
+        IndexName: 'email-index',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: {
+          ':email': email.toLowerCase()
+        }
+      };
+      const emailResult = await dynamodb.send(new QueryCommand(emailQuery));
+      existingUsers.push(...emailResult.Items);
+    }
+
+    // Check by phone if provided
+    if (phone) {
+      const phoneQuery = {
+        TableName: USERS_TABLE,
+        IndexName: 'phone-index',
+        KeyConditionExpression: 'phone = :phone',
+        ExpressionAttributeValues: {
+          ':phone': phone.replace(/\D/g, '') // Store phone as digits only
+        }
+      };
+      const phoneResult = await dynamodb.send(new QueryCommand(phoneQuery));
+      existingUsers.push(...phoneResult.Items);
+    }
+
+    if (existingUsers.length > 0) {
+      const conflictField = email && existingUsers.some(u => u.email === email.toLowerCase()) ? 'email' : 'phone';
       return {
         statusCode: 409,
         headers,
         body: JSON.stringify({ 
-          error: 'User with this email already exists'
+          error: `User with this ${conflictField} already exists`
         })
       };
     }
@@ -84,10 +132,10 @@ exports.handler = async (event) => {
     
     const newUser = {
       userId,
-      email: email.toLowerCase(),
+      email: email ? email.toLowerCase() : null,
       firstName,
       lastName,
-      phone: phone || null,
+      phone: phone ? phone.replace(/\D/g, '') : null, // Store phone as digits only
       password: hashedPassword,
       isAdmin: Boolean(isAdmin),
       isStub: false,

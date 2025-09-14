@@ -41,18 +41,40 @@ exports.handler = async (event) => {
       }
 
       const query = event.queryStringParameters?.q || '';
+      const normalizedPhone = query.replace(/\D/g, ''); // Remove non-digits for phone search
+      
+      let filterExpression = 'contains(#firstName, :query) OR contains(#lastName, :query)';
+      const expressionAttributeNames = {
+        '#firstName': 'firstName',
+        '#lastName': 'lastName'
+      };
+      const expressionAttributeValues = {
+        ':query': query.toLowerCase()
+      };
+
+      // Add email search - use exact match if it looks like an email, otherwise partial match
+      const isEmailSearch = query.includes('@') && query.includes('.');
+      if (isEmailSearch) {
+        // For email-like searches, use exact match
+        filterExpression += ' OR (attribute_exists(#email) AND #email = :query)';
+      } else {
+        // For general searches, use partial match
+        filterExpression += ' OR (attribute_exists(#email) AND contains(#email, :query))';
+      }
+      expressionAttributeNames['#email'] = 'email';
+
+      // Add phone search if phone field exists and we have digits to search
+      if (normalizedPhone.length >= 3) {
+        filterExpression += ' OR (attribute_exists(#phone) AND contains(#phone, :phone))';
+        expressionAttributeNames['#phone'] = 'phone';
+        expressionAttributeValues[':phone'] = normalizedPhone;
+      }
       
       const scanParams = {
         TableName: USERS_TABLE,
-        FilterExpression: 'contains(#firstName, :query) OR contains(#lastName, :query) OR contains(#email, :query)',
-        ExpressionAttributeNames: {
-          '#firstName': 'firstName',
-          '#lastName': 'lastName',
-          '#email': 'email'
-        },
-        ExpressionAttributeValues: {
-          ':query': query.toLowerCase()
-        },
+        FilterExpression: filterExpression,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
         Limit: 20 // Limit results for performance
       };
 

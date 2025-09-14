@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Edit, X, Save, Loader, Key, Shield } from 'lucide-react';
+import { User, Edit, Save, Loader, Key, Shield } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, changePassword } from '../../services/profileService';
 

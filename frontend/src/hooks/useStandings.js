@@ -3,14 +3,14 @@ import { calculateSeasonStandings } from '../utils/gameUtils';
 import { sortStandings } from '../utils/sortUtils';
 import { DEFAULT_SORT, SORT_DIRECTIONS } from '../constants/config';
 
-export const useStandings = (games) => {
+export const useStandings = (games, users = []) => {
   const [sortField, setSortField] = useState(DEFAULT_SORT.field);
   const [sortDirection, setSortDirection] = useState(DEFAULT_SORT.direction);
 
   // Calculate raw standings from games
   const standings = useMemo(() => {
-    return calculateSeasonStandings(games);
-  }, [games]);
+    return calculateSeasonStandings(games, users);
+  }, [games, users]);
 
   // Sort standings based on current sort settings
   const sortedStandings = useMemo(() => {
