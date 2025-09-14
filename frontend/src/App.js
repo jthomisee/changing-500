@@ -91,6 +91,32 @@ const Changing500 = () => {
     isLoading: standingsLoading
   } = useStandings(filteredGames, groupUsers, groupUsersLoading);
 
+  // Mobile expandable rows state
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  
+  // Screen size detection for responsive layout
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Toggle expanded row for mobile
+  const toggleRowExpanded = (playerId) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(playerId)) {
+      newExpanded.delete(playerId);
+    } else {
+      newExpanded.add(playerId);
+    }
+    setExpandedRows(newExpanded);
+  };
+
   // Game Form
   const {
     showAddGame,
@@ -245,44 +271,87 @@ const Changing500 = () => {
         {/* Header */}
         <div className="mb-8">
           {/* Top Header Bar */}
-          <div className="flex items-center justify-between mb-4">
-            {/* Left: App Title */}
-            <button 
-              onClick={() => setActiveView('games')}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              <Trophy className="w-10 h-10 text-yellow-500" />
-              <h1 className="text-4xl font-bold text-gray-800">Changing 500</h1>
-            </button>
-            
-            {/* Right: User Actions */}
-            <div className="flex items-center gap-3">
-              {currentUser && (
-                <GroupSelector
-                  groups={groups}
-                  selectedGroup={selectedGroup}
-                  onSelectGroup={selectGroup}
-                  onCreateGroup={() => setShowCreateGroup(true)}
-                  loading={loadingGroups}
-                  error={groupError}
-                  isAdmin={isAdmin}
-                />
-              )}
+          {isMobile ? (
+            // Mobile: Vertical layout
+            <div className="mb-4">
+              {/* App Title - Full width on mobile */}
+              <button 
+                onClick={() => setActiveView('games')}
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer w-full justify-center mb-4"
+              >
+                <Trophy className="w-8 h-8 text-yellow-500 flex-shrink-0" />
+                <h1 className="text-2xl font-bold text-gray-800">Changing 500</h1>
+              </button>
               
-              {currentUser ? (
-                <UserDropdown 
-                  onProfileClick={() => setActiveView('profile')} 
-                  onUserManagementClick={() => setActiveView('users')}
-                  onGroupMembersClick={() => setActiveView('groups')}
-                  selectedGroup={selectedGroup}
-                />
-              ) : (
-                <AuthButtons 
-                  onShowUserAuth={() => setShowUserAuth(true)}
-                />
-              )}
+              {/* User Actions - Below title */}
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                {currentUser && (
+                  <GroupSelector
+                    groups={groups}
+                    selectedGroup={selectedGroup}
+                    onSelectGroup={selectGroup}
+                    onCreateGroup={() => setShowCreateGroup(true)}
+                    loading={loadingGroups}
+                    error={groupError}
+                    isAdmin={isAdmin}
+                  />
+                )}
+                
+                {currentUser ? (
+                  <UserDropdown 
+                    onProfileClick={() => setActiveView('profile')} 
+                    onUserManagementClick={() => setActiveView('users')}
+                    onGroupMembersClick={() => setActiveView('groups')}
+                    selectedGroup={selectedGroup}
+                  />
+                ) : (
+                  <AuthButtons 
+                    onShowUserAuth={() => setShowUserAuth(true)}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            // Desktop: Horizontal layout (unchanged)
+            <div className="flex items-center justify-between mb-4 overflow-hidden">
+              {/* Left: App Title */}
+              <button 
+                onClick={() => setActiveView('games')}
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer min-w-0"
+              >
+                <Trophy className="w-10 h-10 text-yellow-500 flex-shrink-0" />
+                <h1 className="text-4xl font-bold text-gray-800 truncate">Changing 500</h1>
+              </button>
+              
+              {/* Right: User Actions */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {currentUser && (
+                  <GroupSelector
+                    groups={groups}
+                    selectedGroup={selectedGroup}
+                    onSelectGroup={selectGroup}
+                    onCreateGroup={() => setShowCreateGroup(true)}
+                    loading={loadingGroups}
+                    error={groupError}
+                    isAdmin={isAdmin}
+                  />
+                )}
+                
+                {currentUser ? (
+                  <UserDropdown 
+                    onProfileClick={() => setActiveView('profile')} 
+                    onUserManagementClick={() => setActiveView('users')}
+                    onGroupMembersClick={() => setActiveView('groups')}
+                    selectedGroup={selectedGroup}
+                  />
+                ) : (
+                  <AuthButtons 
+                    onShowUserAuth={() => setShowUserAuth(true)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
           
           {currentUser && groups.length === 0 && !loadingGroups && (
             <div className="mt-6 max-w-md mx-auto text-center">
@@ -363,106 +432,47 @@ const Changing500 = () => {
 
         {/* Group Leaderboard */}
         <div className="bg-white rounded-lg shadow-lg mb-8">
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-4">
               <TrendingUp className="w-6 h-6 text-blue-600" />
-              <h2 className="text-2xl font-semibold text-gray-800">Group Leaderboard</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Group Leaderboard</h2>
             </div>
           </div>
           
+          {/* Desktop Table View */}
+          {!isMobile && (
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <SortableHeader 
-                    field="rank" 
-                    sticky={true}
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="rank" sticky={true} sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Rank
                   </SortableHeader>
-                  <SortableHeader 
-                    field="player" 
-                    sticky={true}
-                    stickyLeft="left-12"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="player" sticky={true} stickyLeft="left-12" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Player
                   </SortableHeader>
-                  <SortableHeader 
-                    field="points" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="points" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Points
                   </SortableHeader>
-                  <SortableHeader 
-                    field="games" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="games" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Games
                   </SortableHeader>
-                  <SortableHeader 
-                    field="winRate" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="winRate" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Win Rate
                   </SortableHeader>
-                  <SortableHeader 
-                    field="avgPosition" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="avgPosition" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Avg Pos
                   </SortableHeader>
-                  <SortableHeader 
-                    field="currentStreak" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="currentStreak" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Streak
                   </SortableHeader>
-                  <SortableHeader 
-                    field="bestHandWinCount" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="bestHandWinCount" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Best Hand Wins
                   </SortableHeader>
-                  <SortableHeader 
-                    field="winnings" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="winnings" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     Total Winnings
                   </SortableHeader>
-                  <SortableHeader 
-                    field="netWinnings" 
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
+                  <SortableHeader field="netWinnings" align="text-center" sortField={sortField} sortDirection={sortDirection} onSort={handleSort}>
                     P&L
                   </SortableHeader>
                 </tr>
@@ -502,64 +512,143 @@ const Changing500 = () => {
                         <div className="flex items-center gap-1">
                           {player.rank === 1 && <Trophy className="w-4 h-4 text-yellow-600" />}
                           {player.rank}
-                      </div>
-                    </td>
+                        </div>
+                      </td>
                       <td className={`px-4 py-3 text-left font-medium sticky left-12 z-10 shadow-sm border-r ${getStickyBgClass()}`}>
                         <div className="flex items-center gap-1">
-                          {player.rank === 1 && <Trophy className="w-4 h-4 text-yellow-600" />}
                           {player.player}
                         </div>
                       </td>
-                    <td className="px-4 py-3 text-center font-semibold text-blue-600">
-                      {player.points}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {player.games}
-                    </td>
-                    <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center font-semibold text-blue-600">{player.points}</td>
+                      <td className="px-4 py-3 text-center">{player.games}</td>
+                      <td className="px-4 py-3 text-center">
                         {player.winRate.toFixed(1)}%
-                      <div className="text-xs text-gray-500">
-                        {player.wins}W - {player.games - player.wins}L
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {player.avgPosition.toFixed(1)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {player.streakType === 'win' ? (
-                        <span className="text-green-600 font-semibold">
-                          W{player.currentStreak}
-                        </span>
-                      ) : player.streakType === 'loss' ? (
-                        <span className="text-red-600 font-semibold">
-                          L{player.currentStreak}
-                      </span>
-                      ) : (
-                        <span className="text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="font-semibold text-purple-600">{player.bestHandWinCount}</div>
-                      <div className="text-xs text-gray-500">
-                        Participated: {player.bestHandParticipationCount} times
-                      </div>
-                    </td>
-                    <td className={`px-4 py-3 text-center font-semibold ${
-                      player.winnings >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ${player.winnings.toFixed(2)}
-                    </td>
-                    <td className={`px-4 py-3 text-center font-semibold ${
-                      player.netWinnings >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ${player.netWinnings.toFixed(2)}
-                    </td>
-                  </tr>
+                        <div className="text-xs text-gray-500">{player.wins}W - {player.games - player.wins}L</div>
+                      </td>
+                      <td className="px-4 py-3 text-center">{player.avgPosition.toFixed(1)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {player.streakType === 'win' ? (
+                          <span className="text-green-600 font-semibold">W{player.currentStreak}</span>
+                        ) : player.streakType === 'loss' ? (
+                          <span className="text-red-600 font-semibold">L{player.currentStreak}</span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="font-semibold text-purple-600">{player.bestHandWinCount}</div>
+                        <div className="text-xs text-gray-500">Participated: {player.bestHandParticipationCount} times</div>
+                      </td>
+                      <td className={`px-4 py-3 text-center font-semibold ${player.winnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${player.winnings.toFixed(2)}
+                      </td>
+                      <td className={`px-4 py-3 text-center font-semibold ${player.netWinnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${player.netWinnings.toFixed(2)}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          )}
+
+          {/* Mobile Card View */}
+          {isMobile && (
+          <div>
+            {standingsLoading ? (
+              <div className="px-6 py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="text-gray-500">Loading standings...</div>
+                </div>
+              </div>
+            ) : standings.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-500">
+                No games found for this group. Add some games to see standings!
+              </div>
+            ) : standings.map((player) => {
+              const isExpanded = expandedRows.has(player.userId);
+              const getCardColorClass = () => {
+                if (player.rank === 1) return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-yellow-200';
+                if (player.rank === 2) return 'bg-gradient-to-r from-slate-200 to-slate-100 border-slate-300';
+                return 'bg-white border-gray-200';
+              };
+
+              return (
+                <div key={player.player} className={`border-b last:border-b-0 ${getCardColorClass()}`}>
+                  <div 
+                    className="p-4 cursor-pointer hover:bg-opacity-80 transition-colors"
+                    onClick={() => toggleRowExpanded(player.userId)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="flex items-center gap-1">
+                          {player.rank === 1 && <Trophy className="w-5 h-5 text-yellow-600" />}
+                          <span className="font-bold text-lg">#{player.rank}</span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-800">{player.player}</div>
+                          <div className="text-sm text-gray-600">{player.games} games</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="font-semibold text-blue-600 text-lg">{player.points}</div>
+                          <div className="text-xs text-gray-500">points</div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-gray-200 bg-white bg-opacity-50">
+                      <div className="grid grid-cols-2 gap-4 pt-4">
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500">Win Rate</div>
+                          <div className="font-semibold">{player.winRate.toFixed(1)}%</div>
+                          <div className="text-xs text-gray-400">{player.wins}W - {player.games - player.wins}L</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500">Avg Position</div>
+                          <div className="font-semibold">{player.avgPosition.toFixed(1)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500">Current Streak</div>
+                          {player.streakType === 'win' ? (
+                            <div className="text-green-600 font-semibold">W{player.currentStreak}</div>
+                          ) : player.streakType === 'loss' ? (
+                            <div className="text-red-600 font-semibold">L{player.currentStreak}</div>
+                          ) : (
+                            <div className="text-gray-500">-</div>
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500">Best Hand Wins</div>
+                          <div className="font-semibold text-purple-600">{player.bestHandWinCount}</div>
+                          <div className="text-xs text-gray-400">of {player.bestHandParticipationCount}</div>
+                        </div>
+                        <div className="text-center col-span-1">
+                          <div className="text-sm text-gray-500">Total Winnings</div>
+                          <div className={`font-semibold ${player.winnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${player.winnings.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="text-center col-span-1">
+                          <div className="text-sm text-gray-500">P&L</div>
+                          <div className={`font-semibold ${player.netWinnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${player.netWinnings.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          )}
         </div>
 
         {/* Recent Games */}
