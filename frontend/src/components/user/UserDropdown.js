@@ -184,7 +184,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
                             {formatGameTime(game)}
                           </div>
                           <p className="text-sm font-medium text-gray-900 truncate">
-                            Game #{game.gameNumber}
+                            Poker Game
                           </p>
                         </div>
                       </div>

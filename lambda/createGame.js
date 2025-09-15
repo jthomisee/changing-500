@@ -96,13 +96,14 @@ exports.handler = async (event) => {
     });
     
     // Generate unique ID
-    const id = `game_${gameData.date.replace(/-/g, '')}_${gameData.gameNumber}_${uuidv4().substring(0, 8)}`;
+    const id = `game_${gameData.date.replace(/-/g, '')}_${uuidv4().substring(0, 8)}`;
     
     const item = {
       ...gameData,
       results: resultsWithTies,
       id,
       time: gameData.time || null,
+      status: gameData.status || 'completed',
       createdAt: gameData.createdAt || new Date().toISOString()
     };
 

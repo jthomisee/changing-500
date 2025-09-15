@@ -91,3 +91,45 @@ resource "aws_iam_role_policy_attachment" "lambda_ssm_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_ssm_policy.arn
   role       = aws_iam_role.lambda_execution_role.name
 }
+
+# IAM policy for Lambda to access Amazon Connect
+ 
+
+# IAM policy for Lambda to access SQS
+resource "aws_iam_policy" "lambda_sqs_policy" {
+  name        = "${var.project_name}-lambda-sqs-policy-${var.environment}"
+  description = "Policy for Lambda to access SQS queues"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = [
+          aws_sqs_queue.sms_notification_queue.arn,
+          aws_sqs_queue.email_notification_queue.arn,
+          aws_sqs_queue.sms_notification_dlq.arn,
+          aws_sqs_queue.email_notification_dlq.arn
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+# Attach Connect policy to Lambda role
+ 
+
+# Attach SQS policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_sqs_policy_attachment" {
+  policy_arn = aws_iam_policy.lambda_sqs_policy.arn
+  role       = aws_iam_role.lambda_execution_role.name
+}

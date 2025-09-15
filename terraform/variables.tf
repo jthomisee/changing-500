@@ -29,3 +29,22 @@ locals {
     ManagedBy   = "Terraform"
   }
 }
+
+variable "twilio_account_sid" {
+  description = "Twilio Account SID"
+  type        = string
+  default     = ""
+}
+
+variable "twilio_auth_token" {
+  description = "Twilio Auth Token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "twilio_from_number" {
+  description = "Twilio phone number in E.164 format"
+  type        = string
+  default     = ""
+}

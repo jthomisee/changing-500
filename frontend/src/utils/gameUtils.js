@@ -31,17 +31,6 @@ export const calculatePoints = (results, playerResult) => {
   return totalPointsForTiedPositions / tiedCount;
 };
 
-// Helper function to check if a game is in the future
-const isGameInFuture = (game) => {
-  if (!game.date) return false;
-  
-  const gameDateTime = game.time ? 
-    new Date(`${game.date}T${game.time}:00.000Z`) : // Treat stored time as UTC
-    new Date(`${game.date}T00:00:00.000Z`);
-  
-  return gameDateTime > new Date();
-};
-
 // Calculate season standings for all players
 export const calculateSeasonStandings = (games, users = []) => {
   const playerStats = {};
@@ -52,10 +41,10 @@ export const calculateSeasonStandings = (games, users = []) => {
     userLookup[user.userId] = user;
   });
 
-  // Filter out future games from leaderboard calculations
-  const pastGames = games.filter(game => !isGameInFuture(game));
+  // Filter out scheduled games from leaderboard calculations
+  const completedGames = games.filter(game => game.status !== 'scheduled');
 
-  pastGames.forEach(game => {
+  completedGames.forEach(game => {
     // Calculate best hand pot for this game
     const bestHandParticipants = game.results.filter(r => r.bestHandParticipant);
     const bestHandWinners = game.results.filter(r => r.bestHandWinner);

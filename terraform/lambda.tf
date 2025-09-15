@@ -587,3 +587,29 @@ resource "aws_lambda_permission" "api_gateway_create_stub_user" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }
+
+# Permission for Twilio webhook to invoke handle_sms_reply via API Gateway
+resource "aws_lambda_permission" "api_gateway_twilio_webhook" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.handle_sms_reply.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+# Notification Lambda permissions
+resource "aws_lambda_permission" "api_gateway_queue_notification" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.queue_notification.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_handle_rsvp_link" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.handle_rsvp_link.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}

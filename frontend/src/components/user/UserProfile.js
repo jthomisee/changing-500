@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Edit, Save, Loader, Key, Shield } from 'lucide-react';
+import { User, Edit, Save, Loader, Key, Shield, Bell, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, changePassword } from '../../services/profileService';
 
@@ -15,6 +15,23 @@ const UserProfile = () => {
     lastName: currentUser?.lastName || '',
     email: currentUser?.email || '',
     phone: currentUser?.phone || ''
+  });
+
+  // Notification preferences state
+  const [isEditingNotifications, setIsEditingNotifications] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
+  const [notificationSuccess, setNotificationSuccess] = useState('');
+  
+  const [notificationForm, setNotificationForm] = useState({
+    gameInvitations: {
+      email: currentUser?.notificationPreferences?.gameInvitations?.email || false,
+      sms: currentUser?.notificationPreferences?.gameInvitations?.sms || false
+    },
+    gameResults: {
+      email: currentUser?.notificationPreferences?.gameResults?.email || false,
+      sms: currentUser?.notificationPreferences?.gameResults?.sms || false
+    }
   });
 
   // Password change state
@@ -39,6 +56,64 @@ const UserProfile = () => {
     setIsEditing(true);
     setError('');
     setSuccess('');
+  };
+
+  const handleNotificationEditClick = () => {
+    setNotificationForm({
+      gameInvitations: {
+        email: currentUser?.notificationPreferences?.gameInvitations?.email || false,
+        sms: currentUser?.notificationPreferences?.gameInvitations?.sms || false
+      },
+      gameResults: {
+        email: currentUser?.notificationPreferences?.gameResults?.email || false,
+        sms: currentUser?.notificationPreferences?.gameResults?.sms || false
+      }
+    });
+    setIsEditingNotifications(true);
+    setNotificationError('');
+    setNotificationSuccess('');
+  };
+
+  const handleNotificationCancel = () => {
+    setIsEditingNotifications(false);
+    setNotificationError('');
+    setNotificationSuccess('');
+    setNotificationForm({
+      gameInvitations: {
+        email: currentUser?.notificationPreferences?.gameInvitations?.email || false,
+        sms: currentUser?.notificationPreferences?.gameInvitations?.sms || false
+      },
+      gameResults: {
+        email: currentUser?.notificationPreferences?.gameResults?.email || false,
+        sms: currentUser?.notificationPreferences?.gameResults?.sms || false
+      }
+    });
+  };
+
+  const handleNotificationSave = async (e) => {
+    e.preventDefault();
+    
+    setSavingNotifications(true);
+    setNotificationError('');
+    setNotificationSuccess('');
+
+    try {
+      const result = await updateMyProfile({
+        notificationPreferences: notificationForm
+      });
+      
+      if (result.success) {
+        refreshCurrentUser(result.user);
+        setNotificationSuccess('Notification preferences updated successfully!');
+        setIsEditingNotifications(false);
+      } else {
+        setNotificationError(result.error);
+      }
+    } catch (err) {
+      setNotificationError('Failed to update notification preferences');
+    } finally {
+      setSavingNotifications(false);
+    }
   };
 
   const handleCancel = () => {
@@ -458,6 +533,244 @@ const UserProfile = () => {
               <label className="block text-sm font-medium text-gray-500 mb-1">Password</label>
               <p className="text-lg text-gray-900">••••••••••••</p>
               <p className="text-sm text-gray-500 mt-1">Last updated: {formatDate(currentUser?.updatedAt)}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Notification Preferences Section */}
+      <div className="mt-8 border-t border-gray-200 pt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Bell className="w-6 h-6 text-green-600" />
+            <h3 className="text-xl font-bold text-gray-800">Notification Preferences</h3>
+          </div>
+          
+          {!isEditingNotifications && (
+            <button
+              onClick={handleNotificationEditClick}
+              className="flex items-center gap-2 px-4 py-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Preferences
+            </button>
+          )}
+        </div>
+
+        {/* Notification Success/Error Messages */}
+        {notificationSuccess && (
+          <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            {notificationSuccess}
+          </div>
+        )}
+
+        {notificationError && (
+          <div className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {notificationError}
+          </div>
+        )}
+
+        {isEditingNotifications ? (
+          /* Notification Edit Form */
+          <form onSubmit={handleNotificationSave} className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-blue-600" />
+                <p className="text-sm text-blue-800">
+                  <strong>Notification Settings:</strong>
+                </p>
+              </div>
+              <ul className="text-sm text-blue-700 mt-2 ml-7 list-disc">
+                <li>Game Invitations: When you're invited to a game (RSVP pending or yes)</li>
+                <li>Game Results: When a game you participated in is marked as completed</li>
+                <li>SMS notifications require a valid phone number in your profile</li>
+              </ul>
+            </div>
+
+            <div className="space-y-6">
+              {/* Game Invitations */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-blue-600" />
+                  Game Invitations
+                </h4>
+                <p className="text-sm text-gray-600 mb-4">
+                  Receive notifications when you're invited to a scheduled game.
+                </p>
+                
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={notificationForm.gameInvitations.email}
+                      onChange={(e) => setNotificationForm(prev => ({
+                        ...prev,
+                        gameInvitations: {
+                          ...prev.gameInvitations,
+                          email: e.target.checked
+                        }
+                      }))}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">Email notifications</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={notificationForm.gameInvitations.sms}
+                      onChange={(e) => setNotificationForm(prev => ({
+                        ...prev,
+                        gameInvitations: {
+                          ...prev.gameInvitations,
+                          sms: e.target.checked
+                        }
+                      }))}
+                      disabled={!currentUser?.phone}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">
+                      SMS notifications {!currentUser?.phone && '(requires phone number)'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Game Results */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-green-600" />
+                  Game Results
+                </h4>
+                <p className="text-sm text-gray-600 mb-4">
+                  Receive notifications when games you participated in are completed with results.
+                </p>
+                
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={notificationForm.gameResults.email}
+                      onChange={(e) => setNotificationForm(prev => ({
+                        ...prev,
+                        gameResults: {
+                          ...prev.gameResults,
+                          email: e.target.checked
+                        }
+                      }))}
+                      className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                    />
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">Email notifications</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={notificationForm.gameResults.sms}
+                      onChange={(e) => setNotificationForm(prev => ({
+                        ...prev,
+                        gameResults: {
+                          ...prev.gameResults,
+                          sms: e.target.checked
+                        }
+                      }))}
+                      disabled={!currentUser?.phone}
+                      className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                    />
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">
+                      SMS notifications {!currentUser?.phone && '(requires phone number)'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4">
+              <button
+                type="button"
+                onClick={handleNotificationCancel}
+                disabled={savingNotifications}
+                className="px-6 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingNotifications}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingNotifications ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {savingNotifications ? 'Saving...' : 'Save Preferences'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* Notification Preferences - View Mode */
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Game Invitations View */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-blue-600" />
+                  Game Invitations
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">Email: </span>
+                    <span className={`text-sm font-medium ${
+                      currentUser?.notificationPreferences?.gameInvitations?.email ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {currentUser?.notificationPreferences?.gameInvitations?.email ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">SMS: </span>
+                    <span className={`text-sm font-medium ${
+                      currentUser?.notificationPreferences?.gameInvitations?.sms ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {currentUser?.notificationPreferences?.gameInvitations?.sms ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Game Results View */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-green-600" />
+                  Game Results
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">Email: </span>
+                    <span className={`text-sm font-medium ${
+                      currentUser?.notificationPreferences?.gameResults?.email ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {currentUser?.notificationPreferences?.gameResults?.email ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">SMS: </span>
+                    <span className={`text-sm font-medium ${
+                      currentUser?.notificationPreferences?.gameResults?.sms ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {currentUser?.notificationPreferences?.gameResults?.sms ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

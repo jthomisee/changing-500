@@ -18,6 +18,9 @@ import PlayerInput from './components/games/PlayerInput';
 import UserManagement from './components/admin/UserManagement';
 import UserProfile from './components/user/UserProfile';
 import UserDropdown from './components/user/UserDropdown';
+
+// Services
+import { triggerGameInvitations, triggerGameResults } from './services/notificationService';
 import GroupManagement from './components/groups/GroupManagement';
 import GroupSelector from './components/groups/GroupSelector';
 
@@ -222,7 +225,12 @@ const Changing500 = () => {
 
   const isAuthenticated = !!currentUser;
 
-  // Helper function to check if a game is scheduled for the future (handles UTC stored times)
+  // Helper function to check if a game is scheduled (not completed)
+  const isGameScheduled = (game) => {
+    return game.status === 'scheduled';
+  };
+
+  // Helper function to check if a game is scheduled for the future (handles UTC stored times)  
   const isGameInFuture = (gameDate, gameTime) => {
     if (!gameDate) return false;
     
@@ -283,6 +291,43 @@ const Changing500 = () => {
     return new Date(game.date).toLocaleDateString();
   };
 
+  // Notification handlers
+  const [sendingNotifications, setSendingNotifications] = useState(false);
+
+  const handleSendInvitations = async (gameId) => {
+    setSendingNotifications(true);
+    try {
+      const result = await triggerGameInvitations(gameId);
+      if (result.success) {
+        // Show success message or notification
+        console.log('Game invitations sent successfully');
+      } else {
+        console.error('Failed to send invitations:', result.error);
+      }
+    } catch (error) {
+      console.error('Error sending invitations:', error);
+    } finally {
+      setSendingNotifications(false);
+    }
+  };
+
+  const handleSendResults = async (gameId) => {
+    setSendingNotifications(true);
+    try {
+      const result = await triggerGameResults(gameId);
+      if (result.success) {
+        // Show success message or notification
+        console.log('Game results notifications sent successfully');
+      } else {
+        console.error('Failed to send results notifications:', result.error);
+      }
+    } catch (error) {
+      console.error('Error sending results notifications:', error);
+    } finally {
+      setSendingNotifications(false);
+    }
+  };
+
   // Handle RSVP change from dropdown
   const handleRSVPChange = async (gameId, newStatus) => {
     try {
@@ -308,7 +353,7 @@ const Changing500 = () => {
 
   // Get upcoming games for current user's groups
   const upcomingGames = filteredGames
-    .filter(game => isGameInFuture(game.date, game.time))
+    .filter(game => isGameScheduled(game))
     .filter(game => game.results?.some(r => r.userId === currentUser?.userId))
     .sort((a, b) => {
       const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
@@ -331,11 +376,21 @@ const Changing500 = () => {
       // Convert local time to UTC for storage
       const { date: utcDate, time: utcTime } = convertToUTC(newGame.date, newGame.time);
       
-      // Include groupId in the game data
+      // For new games, force scheduled status if time is in the future
+      // For editing existing games, respect the user's choice
+      let gameStatus;
+      if (isEditing) {
+        gameStatus = newGame.status || 'completed';
+      } else {
+        gameStatus = isGameInFuture(utcDate, utcTime) ? 'scheduled' : 'completed';
+      }
+      
+      // Include groupId and status in the game data
       const gameDataWithGroup = {
         ...newGame,
         date: utcDate,
         time: utcTime,
+        status: gameStatus,
         groupId: selectedGroup.groupId
       };
       
@@ -755,7 +810,7 @@ const Changing500 = () => {
         </div>
 
         {/* Upcoming Games */}
-        {selectedGroup && filteredGames.some(game => isGameInFuture(game.date, game.time)) && (
+        {selectedGroup && filteredGames.some(game => isGameScheduled(game)) && (
           <div className="bg-white rounded-lg shadow-lg mb-8">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
@@ -768,7 +823,7 @@ const Changing500 = () => {
             
             <div className="divide-y divide-gray-200">
               {filteredGames
-                .filter(game => isGameInFuture(game.date, game.time))
+                .filter(game => isGameScheduled(game))
                 .sort((a, b) => {
                   // Sort upcoming games by date/time (earliest first)
                   const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
@@ -785,7 +840,6 @@ const Changing500 = () => {
                         Scheduled
                       </span>
                     </h3>
-                    <p className="text-gray-600">Game #{game.gameNumber}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -798,6 +852,19 @@ const Changing500 = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <LoadingButton
+                      onClick={() => handleSendInvitations(game.id)}
+                      loading={sendingNotifications}
+                      disabled={!isAuthenticated}
+                      className={`px-3 py-1 text-sm rounded-lg ${
+                        isAuthenticated 
+                          ? 'bg-green-600 text-white hover:bg-green-700' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                      title={isAuthenticated ? "Send game invitations" : "Please login to send invitations"}
+                    >
+                      Send Invitations
+                    </LoadingButton>
           <button
                       onClick={() => isAuthenticated && startEditingGame(game)}
                       className={`p-2 rounded-lg ${
@@ -899,7 +966,7 @@ const Changing500 = () => {
               <div className="p-6 text-center">
                 <p className="text-gray-500">Select a group to view games</p>
               </div>
-            ) : filteredGames.filter(game => !isGameInFuture(game.date, game.time)).length === 0 ? (
+            ) : filteredGames.filter(game => !isGameScheduled(game)).length === 0 ? (
               <div className="p-6 text-center">
                 <p className="text-gray-500">No games recorded yet for {selectedGroup.name}</p>
                 {currentUser && (
@@ -908,15 +975,20 @@ const Changing500 = () => {
               </div>
             ) : (
               filteredGames
-                .filter(game => !isGameInFuture(game.date, game.time))
-                .slice().reverse().map((game) => (
+                .filter(game => !isGameScheduled(game))
+                .sort((a, b) => {
+                  // Sort by date/time with most recent first
+                  const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
+                  const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
+                  return bDateTime - aDateTime; // Most recent first
+                })
+                .map((game) => (
                 <div key={game.id} className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-lg">
                       {formatGameDateTime(game)}
                     </h3>
-                    <p className="text-gray-600">Game #{game.gameNumber}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -929,6 +1001,19 @@ const Changing500 = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <LoadingButton
+                      onClick={() => handleSendResults(game.id)}
+                      loading={sendingNotifications}
+                      disabled={!isAuthenticated}
+                      className={`px-3 py-1 text-sm rounded-lg ${
+                        isAuthenticated 
+                          ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                      title={isAuthenticated ? "Send game results" : "Please login to send results"}
+                    >
+                      Send Results
+                    </LoadingButton>
           <button
                       onClick={() => isAuthenticated && startEditingGame(game)}
                       className={`p-2 rounded-lg ${
@@ -962,11 +1047,11 @@ const Changing500 = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-300">
-                          {!isGameInFuture(game.date, game.time) && (
+                          {!isGameScheduled(game) && (
                             <th className="text-left py-2 px-3">Pos</th>
                           )}
                           <th className="text-left py-2 px-3">Player</th>
-                          {!isGameInFuture(game.date, game.time) && (
+                          {!isGameScheduled(game) && (
                             <>
                               <th className="text-center py-2 px-3">Points</th>
                               <th className="text-center py-2 px-3">Winnings</th>
@@ -974,7 +1059,7 @@ const Changing500 = () => {
                               <th className="text-center py-2 px-3">Best Hand</th>
                             </>
                           )}
-                          {isGameInFuture(game.date, game.time) && (
+                          {isGameScheduled(game) && (
                             <th className="text-center py-2 px-3">RSVP</th>
                           )}
                         </tr>
@@ -992,7 +1077,7 @@ const Changing500 = () => {
                             };
                             return (
                               <tr key={index} className={getRowColorClass()}>
-                                {!isGameInFuture(game.date, game.time) && (
+                                {!isGameScheduled(game) && (
                                   <td className="py-2 px-3 font-medium">
                                     <div className="flex items-center gap-1">
                                       {result.position === 1 && <Trophy className="w-3 h-3 text-yellow-600" />}
@@ -1001,7 +1086,7 @@ const Changing500 = () => {
                                   </td>
                                 )}
                                 <td className="py-2 px-3 font-medium">{getUserDisplayName(result.userId)}</td>
-                                {!isGameInFuture(game.date, game.time) && (
+                                {!isGameScheduled(game) && (
                                   <>
                                     <td className="py-2 px-3 text-center text-blue-600 font-semibold">
                                       {points.toFixed(1)}
@@ -1025,7 +1110,7 @@ const Changing500 = () => {
                                     </td>
                                   </>
                                 )}
-                                {isGameInFuture(game.date, game.time) && (
+                                {isGameScheduled(game) && (
                                   <td className="py-2 px-3 text-center">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                                       result.rsvpStatus === 'yes' ? 'bg-green-100 text-green-800' :
@@ -1087,21 +1172,39 @@ const Changing500 = () => {
                     className="w-full max-w-md border rounded px-4 py-3 text-base"
                 />
               </div>
-              <div>
-                  <label className="block text-sm font-medium mb-2">Game Number</label>
-                <input
-                  type="number"
-                    value={newGame.gameNumber}
-                    onChange={(e) => updateGameData('gameNumber', parseInt(e.target.value) || 1)}
-                    className="w-full max-w-xs border rounded px-4 py-3 text-base"
-                  min="1"
-                />
-              </div>
+              {isEditing && (
+                <div>
+                    <label className="block text-sm font-medium mb-2">Status</label>
+                  <select
+                    value={newGame.status || 'completed'}
+                    onChange={(e) => updateGameData('status', e.target.value)}
+                      className="w-full max-w-xs border rounded px-4 py-3 text-base"
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Change to "Completed" to add results and include in leaderboard
+                  </p>
+                </div>
+              )}
+              {!isEditing && isGameInFuture(newGame.date, newGame.time) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Future Game:</strong> This game will be created as "Scheduled" for RSVP tracking. 
+                    You can convert it to "Completed" later to add results.
+                  </p>
+                </div>
+              )}
             </div>
 
-              {/* Players */}
-            <h4 className="font-semibold mb-3">Players & Results</h4>
-              {newGame.results.map((result, index) => (
+              {/* Players - Only show if date is selected */}
+              {newGame.date && (
+                <>
+                  <h4 className="font-semibold mb-3">
+                    {(!isEditing && isGameInFuture(newGame.date, newGame.time)) || (isEditing && newGame.status === 'scheduled') ? 'Players & RSVP' : 'Players & Results'}
+                  </h4>
+                  {newGame.results.map((result, index) => (
                 <div key={index} className="space-y-4 mb-6 p-4 bg-gray-50 rounded-lg border">
                 <div>
                   <label className="block text-sm font-medium mb-2">Player *</label>
@@ -1115,8 +1218,8 @@ const Changing500 = () => {
                       loading={groupUsersLoading}
                   />
                 </div>
-                <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 ${isGameInFuture(newGame.date, newGame.time) ? 'lg:grid-cols-2' : 'lg:grid-cols-5'}`}>
-                {!isGameInFuture(newGame.date, newGame.time) && (
+                <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 ${((!isEditing && isGameInFuture(newGame.date, newGame.time)) || (isEditing && newGame.status === 'scheduled')) ? 'lg:grid-cols-2' : 'lg:grid-cols-5'}`}>
+                {!((!isEditing && isGameInFuture(newGame.date, newGame.time)) || (isEditing && newGame.status === 'scheduled')) && (
                   <>
                     <div>
                         <label className="block text-sm font-medium mb-2">Position</label>
@@ -1174,7 +1277,7 @@ const Changing500 = () => {
                         </div>
                   </>
                 )}
-                {isGameInFuture(newGame.date, newGame.time) && (
+                {((!isEditing && isGameInFuture(newGame.date, newGame.time)) || (isEditing && newGame.status === 'scheduled')) && (
                   <div>
                       <label className="block text-sm font-medium mb-2">RSVP Status</label>
                     <select
@@ -1203,13 +1306,15 @@ const Changing500 = () => {
               </div>
             ))}
 
-              <button
-                type="button"
-                onClick={addPlayerToGame}
-                className="mb-4 text-blue-600 hover:text-blue-800 text-sm underline"
-              >
-                + Add Player
-              </button>
+                  <button
+                    type="button"
+                    onClick={addPlayerToGame}
+                    className="mb-4 text-blue-600 hover:text-blue-800 text-sm underline"
+                  >
+                    + Add Player
+                  </button>
+                </>
+              )}
 
               {/* Form buttons */}
             <div className="flex gap-2 justify-end">

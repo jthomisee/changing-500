@@ -135,6 +135,39 @@ resource "aws_api_gateway_resource" "group_stub_users_resource" {
   path_part   = "stub-users"
 }
 
+# Notifications API Resources
+resource "aws_api_gateway_resource" "notifications_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_rest_api.changing_500_api.root_resource_id
+  path_part   = "notifications"
+}
+
+resource "aws_api_gateway_resource" "notifications_queue_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.notifications_resource.id
+  path_part   = "queue"
+}
+
+# Twilio webhook under /notifications
+resource "aws_api_gateway_resource" "twilio_webhook_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.notifications_resource.id
+  path_part   = "twilio-webhook"
+}
+
+# RSVP API Resources
+resource "aws_api_gateway_resource" "rsvp_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_rest_api.changing_500_api.root_resource_id
+  path_part   = "rsvp"
+}
+
+resource "aws_api_gateway_resource" "rsvp_game_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.rsvp_resource.id
+  path_part   = "{gameId}"
+}
+
 # API Gateway Methods
 resource "aws_api_gateway_method" "get_games_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
@@ -433,6 +466,58 @@ resource "aws_api_gateway_method" "group_stub_users_post_method" {
 resource "aws_api_gateway_method" "group_stub_users_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.group_stub_users_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# Notification methods
+resource "aws_api_gateway_method" "notifications_queue_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "notifications_queue_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# Twilio webhook methods
+resource "aws_api_gateway_method" "twilio_webhook_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "twilio_webhook_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# RSVP methods
+resource "aws_api_gateway_method" "rsvp_game_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "rsvp_game_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "rsvp_game_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_game_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -901,6 +986,88 @@ resource "aws_api_gateway_integration" "group_stub_users_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.group_stub_users_resource.id
   http_method = aws_api_gateway_method.group_stub_users_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# Notification integrations
+resource "aws_api_gateway_integration" "notifications_queue_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method = aws_api_gateway_method.notifications_queue_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.queue_notification.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "notifications_queue_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method = aws_api_gateway_method.notifications_queue_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# Twilio webhook integrations
+resource "aws_api_gateway_integration" "twilio_webhook_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method = aws_api_gateway_method.twilio_webhook_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.handle_sms_reply.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "twilio_webhook_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method = aws_api_gateway_method.twilio_webhook_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# RSVP integrations
+resource "aws_api_gateway_integration" "rsvp_game_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method = aws_api_gateway_method.rsvp_game_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.handle_rsvp_link.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "rsvp_game_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method = aws_api_gateway_method.rsvp_game_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.handle_rsvp_link.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "rsvp_game_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method = aws_api_gateway_method.rsvp_game_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -1427,6 +1594,87 @@ resource "aws_api_gateway_integration_response" "group_stub_users_options_integr
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
+
+# Notifications CORS
+resource "aws_api_gateway_method_response" "notifications_queue_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method = aws_api_gateway_method.notifications_queue_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "notifications_queue_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.notifications_queue_resource.id
+  http_method = aws_api_gateway_method.notifications_queue_options_method.http_method
+  status_code = aws_api_gateway_method_response.notifications_queue_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Twilio webhook CORS
+resource "aws_api_gateway_method_response" "twilio_webhook_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method = aws_api_gateway_method.twilio_webhook_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "twilio_webhook_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.twilio_webhook_resource.id
+  http_method = aws_api_gateway_method.twilio_webhook_options_method.http_method
+  status_code = aws_api_gateway_method_response.twilio_webhook_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# RSVP CORS
+resource "aws_api_gateway_method_response" "rsvp_game_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method = aws_api_gateway_method.rsvp_game_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "rsvp_game_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method = aws_api_gateway_method.rsvp_game_options_method.http_method
+  status_code = aws_api_gateway_method_response.rsvp_game_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
   depends_on = [
@@ -1473,6 +1721,11 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration.group_users_options_integration,
     aws_api_gateway_integration.group_stub_users_post_integration,
     aws_api_gateway_integration.group_stub_users_options_integration,
+    aws_api_gateway_integration.notifications_queue_post_integration,
+    aws_api_gateway_integration.notifications_queue_options_integration,
+    aws_api_gateway_integration.rsvp_game_get_integration,
+    aws_api_gateway_integration.rsvp_game_put_integration,
+    aws_api_gateway_integration.rsvp_game_options_integration,
     aws_api_gateway_integration_response.users_manage_options_integration_response,
     aws_api_gateway_integration_response.user_manage_options_integration_response,
     aws_api_gateway_integration_response.user_convert_stub_options_integration_response,
@@ -1603,6 +1856,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method_response.group_member_options_200.id,
       aws_api_gateway_method_response.group_users_options_200.id,
       aws_api_gateway_method_response.group_stub_users_options_200.id,
+      aws_api_gateway_method_response.notifications_queue_options_200.id,
+      aws_api_gateway_method_response.rsvp_game_options_200.id,
       aws_api_gateway_integration_response.users_manage_options_integration_response.id,
       aws_api_gateway_integration_response.user_manage_options_integration_response.id,
       aws_api_gateway_integration_response.users_profile_options_integration_response.id,
@@ -1612,6 +1867,9 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration_response.group_join_options_integration_response.id,
       aws_api_gateway_integration_response.group_members_options_integration_response.id,
       aws_api_gateway_integration_response.group_member_options_integration_response.id,
+      aws_api_gateway_integration_response.group_stub_users_options_integration_response.id,
+      aws_api_gateway_integration_response.notifications_queue_options_integration_response.id,
+      aws_api_gateway_integration_response.rsvp_game_options_integration_response.id,
     ]))
   }
 

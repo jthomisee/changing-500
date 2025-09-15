@@ -13,7 +13,7 @@ const initialResult = {
 const initialGameState = {
   date: '',
   time: '',
-  gameNumber: 1,
+  status: 'completed', // 'scheduled' or 'completed'
   results: [initialResult]
 };
 

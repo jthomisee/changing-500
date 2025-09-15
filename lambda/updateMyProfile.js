@@ -45,29 +45,32 @@ exports.handler = async (event) => {
       };
     }
 
-    const { firstName, lastName, email, phone } = JSON.parse(event.body || '{}');
+    const { firstName, lastName, email, phone, notificationPreferences } = JSON.parse(event.body || '{}');
     
-    // Validate required fields
-    if (!firstName || !lastName || !email) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'First name, last name, and email are required'
-        })
-      };
-    }
+    // If updating notification preferences only, skip validation of other fields
+    if (!notificationPreferences) {
+      // Validate required fields for profile updates
+      if (!firstName || !lastName || !email) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'First name, last name, and email are required'
+          })
+        };
+      }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid email format'
-        })
-      };
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Invalid email format'
+          })
+        };
+      }
     }
 
     // Get current user to verify they exist
@@ -87,7 +90,7 @@ exports.handler = async (event) => {
     const existingUser = userResult.Item;
 
     // If email is being changed, check if new email already exists
-    if (email.toLowerCase() !== existingUser.email) {
+    if (email && email.toLowerCase() !== existingUser.email) {
       const existingEmailQuery = {
         TableName: USERS_TABLE,
         IndexName: 'email-index',
@@ -112,17 +115,30 @@ exports.handler = async (event) => {
     // Update user profile (NOTE: isAdmin is NOT included - users cannot change their own admin status)
     const now = new Date().toISOString();
     
+    // Build update expression dynamically based on what's being updated
+    let updateExpression = 'SET updatedAt = :updatedAt';
+    const expressionAttributeValues = {
+      ':updatedAt': now
+    };
+
+    if (notificationPreferences) {
+      // Only updating notification preferences
+      updateExpression += ', notificationPreferences = :notificationPreferences';
+      expressionAttributeValues[':notificationPreferences'] = notificationPreferences;
+    } else {
+      // Updating profile fields
+      updateExpression += ', firstName = :firstName, lastName = :lastName, email = :email, phone = :phone';
+      expressionAttributeValues[':firstName'] = firstName;
+      expressionAttributeValues[':lastName'] = lastName;
+      expressionAttributeValues[':email'] = email.toLowerCase();
+      expressionAttributeValues[':phone'] = phone || null;
+    }
+    
     const updateParams = {
       TableName: USERS_TABLE,
       Key: { userId: requestingUserId },
-      UpdateExpression: 'SET firstName = :firstName, lastName = :lastName, email = :email, phone = :phone, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':firstName': firstName,
-        ':lastName': lastName,
-        ':email': email.toLowerCase(),
-        ':phone': phone || null,
-        ':updatedAt': now
-      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
       ReturnValues: 'ALL_NEW'
     };
 

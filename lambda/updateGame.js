@@ -117,26 +117,28 @@ exports.handler = async (event) => {
       return { ...result, tied: false };
     });
     
-    // Update the game
+    // Update the game (preserve existing gameNumber if not provided)
     const updateParams = {
       TableName: TABLE_NAME,
       Key: { id: gameId },
-      UpdateExpression: 'SET #date = :date, #time = :time, gameNumber = :gameNumber, results = :results, groupId = :groupId, updatedAt = :updatedAt, updatedBy = :updatedBy',
+      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, updatedAt = :updatedAt, updatedBy = :updatedBy',
       ExpressionAttributeNames: {
         '#date': 'date', // 'date' is a reserved word in DynamoDB
-        '#time': 'time'  // 'time' is a reserved word in DynamoDB
+        '#time': 'time', // 'time' is a reserved word in DynamoDB
+        '#status': 'status' // 'status' is a reserved word in DynamoDB
       },
       ExpressionAttributeValues: {
         ':date': gameData.date,
         ':time': gameData.time || null,
-        ':gameNumber': gameData.gameNumber,
         ':results': resultsWithTies,
         ':groupId': groupId,
+        ':status': gameData.status || 'completed',
         ':updatedAt': new Date().toISOString(),
         ':updatedBy': userId
       },
       ReturnValues: 'ALL_NEW'
     };
+
 
     const result = await dynamodb.send(new UpdateCommand(updateParams));
     
