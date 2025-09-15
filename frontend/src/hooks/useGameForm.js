@@ -6,11 +6,13 @@ const initialResult = {
   winnings: 0, 
   rebuys: 0, 
   bestHandParticipant: false, 
-  bestHandWinner: false 
+  bestHandWinner: false,
+  rsvpStatus: 'pending'
 };
 
 const initialGameState = {
   date: '',
+  time: '',
   gameNumber: 1,
   results: [initialResult]
 };
@@ -27,10 +29,39 @@ export const useGameForm = () => {
     setShowAddGame(true);
   };
 
+  // Helper function to convert UTC datetime from database to local time for editing
+  const convertFromUTCForEditing = (utcDate, utcTime) => {
+    if (!utcDate) return { date: '', time: '' };
+    
+    if (utcTime) {
+      // Create a UTC date object
+      const utcDateTime = new Date(`${utcDate}T${utcTime}:00.000Z`);
+      // Convert to local timezone
+      const localDate = utcDateTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const localTime = utcDateTime.toLocaleTimeString('en-GB', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }); // HH:MM format
+      return { date: localDate, time: localTime };
+    }
+    
+    return { date: utcDate, time: '' };
+  };
+
   // Open edit game form
   const startEditingGame = (game) => {
-    setEditingGame(game);
-    setNewGame(game);
+    // Convert UTC time back to local time for editing
+    const { date: localDate, time: localTime } = convertFromUTCForEditing(game.date, game.time);
+    
+    const gameWithLocalTime = {
+      ...game,
+      date: localDate,
+      time: localTime
+    };
+    
+    setEditingGame(game); // Keep original game data
+    setNewGame(gameWithLocalTime); // Use local time for form
     setShowAddGame(true);
   };
 

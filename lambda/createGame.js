@@ -102,6 +102,7 @@ exports.handler = async (event) => {
       ...gameData,
       results: resultsWithTies,
       id,
+      time: gameData.time || null,
       createdAt: gameData.createdAt || new Date().toISOString()
     };
 

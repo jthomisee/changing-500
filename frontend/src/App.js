@@ -222,6 +222,100 @@ const Changing500 = () => {
 
   const isAuthenticated = !!currentUser;
 
+  // Helper function to check if a game is scheduled for the future (handles UTC stored times)
+  const isGameInFuture = (gameDate, gameTime) => {
+    if (!gameDate) return false;
+    
+    const gameDateTime = gameTime ? 
+      new Date(`${gameDate}T${gameTime}:00.000Z`) : // Treat stored time as UTC
+      new Date(`${gameDate}T00:00:00.000Z`);
+    
+    return gameDateTime > new Date();
+  };
+
+  // Helper function to convert local datetime to UTC for storage
+  const convertToUTC = (date, time) => {
+    if (!date) return { date, time: null };
+    
+    if (time) {
+      // Create a date object in local timezone
+      const localDateTime = new Date(`${date}T${time}`);
+      // Convert to UTC
+      const utcDate = localDateTime.toISOString().split('T')[0];
+      const utcTime = localDateTime.toISOString().split('T')[1].substring(0, 5);
+      return { date: utcDate, time: utcTime };
+    }
+    
+    return { date, time: null };
+  };
+
+  // Helper function to convert UTC datetime from database to local time for display
+  const convertFromUTC = (utcDate, utcTime) => {
+    if (!utcDate) return { date: '', time: '' };
+    
+    if (utcTime) {
+      // Create a UTC date object
+      const utcDateTime = new Date(`${utcDate}T${utcTime}:00.000Z`);
+      // Convert to local timezone
+      const localDate = utcDateTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const localTime = utcDateTime.toLocaleTimeString('en-GB', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }); // HH:MM format
+      return { date: localDate, time: localTime };
+    }
+    
+    return { date: utcDate, time: '' };
+  };
+
+  // Helper function to format time for display (handles both UTC stored times and local display)
+  const formatGameDateTime = (game) => {
+    if (!game.date) return '';
+    
+    if (game.time) {
+      // Convert UTC time to local time for display
+      const { date: localDate, time: localTime } = convertFromUTC(game.date, game.time);
+      const localDateTime = new Date(`${localDate}T${localTime}`);
+      return localDateTime.toLocaleString();
+    }
+    
+    return new Date(game.date).toLocaleDateString();
+  };
+
+  // Handle RSVP change from dropdown
+  const handleRSVPChange = async (gameId, newStatus) => {
+    try {
+      // Find the game and update the current user's RSVP status
+      const game = filteredGames.find(g => g.id === gameId);
+      if (!game) return;
+
+      // Create updated results with the user's new RSVP status
+      const updatedResults = game.results.map(result => {
+        if (result.userId === currentUser.userId) {
+          return { ...result, rsvpStatus: newStatus };
+        }
+        return result;
+      });
+
+      // Update the game with new RSVP status
+      const updatedGame = { ...game, results: updatedResults };
+      await updateGame(gameId, updatedGame);
+    } catch (error) {
+      console.error('Failed to update RSVP:', error);
+    }
+  };
+
+  // Get upcoming games for current user's groups
+  const upcomingGames = filteredGames
+    .filter(game => isGameInFuture(game.date, game.time))
+    .filter(game => game.results?.some(r => r.userId === currentUser?.userId))
+    .sort((a, b) => {
+      const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
+      const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
+      return aDateTime - bDateTime;
+    });
+
   // Game form handlers
   const handleSaveGame = async (e) => {
     e.preventDefault();
@@ -234,9 +328,14 @@ const Changing500 = () => {
     }
     
     try {
+      // Convert local time to UTC for storage
+      const { date: utcDate, time: utcTime } = convertToUTC(newGame.date, newGame.time);
+      
       // Include groupId in the game data
       const gameDataWithGroup = {
         ...newGame,
+        date: utcDate,
+        time: utcTime,
         groupId: selectedGroup.groupId
       };
       
@@ -291,6 +390,8 @@ const Changing500 = () => {
                     onUserManagementClick={() => setActiveView('users')}
                     onGroupMembersClick={() => setActiveView('groups')}
                     selectedGroup={selectedGroup}
+                    upcomingGames={upcomingGames}
+                    onRSVPChange={handleRSVPChange}
                   />
                 ) : (
                   <AuthButtons 
@@ -343,6 +444,8 @@ const Changing500 = () => {
                     onUserManagementClick={() => setActiveView('users')}
                     onGroupMembersClick={() => setActiveView('groups')}
                     selectedGroup={selectedGroup}
+                    upcomingGames={upcomingGames}
+                    onRSVPChange={handleRSVPChange}
                   />
                 ) : (
                   <AuthButtons 
@@ -651,6 +754,135 @@ const Changing500 = () => {
           )}
         </div>
 
+        {/* Upcoming Games */}
+        {selectedGroup && filteredGames.some(game => isGameInFuture(game.date, game.time)) && (
+          <div className="bg-white rounded-lg shadow-lg mb-8">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-6 h-6 text-blue-600" />
+                <h2 className="text-2xl font-semibold text-gray-800">
+                  Upcoming Games - {selectedGroup.name}
+                </h2>
+              </div>
+            </div>
+            
+            <div className="divide-y divide-gray-200">
+              {filteredGames
+                .filter(game => isGameInFuture(game.date, game.time))
+                .sort((a, b) => {
+                  // Sort upcoming games by date/time (earliest first)
+                  const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
+                  const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
+                  return aDateTime - bDateTime;
+                })
+                .map((game) => (
+                <div key={game.id} className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      {formatGameDateTime(game)}
+                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        Scheduled
+                      </span>
+                    </h3>
+                    <p className="text-gray-600">Game #{game.gameNumber}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <DollarSign className="w-4 h-4" />
+                      Scheduled
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Users className="w-4 h-4" />
+                      {game.results.length} invited
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+          <button
+                      onClick={() => isAuthenticated && startEditingGame(game)}
+                      className={`p-2 rounded-lg ${
+                        isAuthenticated 
+                          ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50' 
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                      disabled={!isAuthenticated}
+                      title={isAuthenticated ? "Edit game" : "Please login to edit games"}
+                    >
+                      <Edit className="w-4 h-4" />
+          </button>
+                <button
+                      onClick={() => isAuthenticated && deleteGame(game.id)}
+                      className={`p-2 rounded-lg ${
+                        isAuthenticated 
+                          ? 'text-red-600 hover:text-red-800 hover:bg-red-50' 
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                      disabled={!isAuthenticated}
+                      title={isAuthenticated ? "Delete game" : "Please login to delete games"}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                </button>
+                  </div>
+                </div>
+                
+                {/* Game RSVP table */}
+                <div className="bg-gray-50 rounded p-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-300">
+                          <th className="text-left py-2 px-3">Player</th>
+                          <th className="text-center py-2 px-3">RSVP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {game.results
+                          .slice()
+                          .sort((a, b) => {
+                            // Sort by RSVP status: yes, pending, no
+                            const order = { yes: 0, pending: 1, no: 2 };
+                            return (order[a.rsvpStatus] || 1) - (order[b.rsvpStatus] || 1);
+                          })
+                          .map((result, index) => {
+                            const isCurrentUser = result.userId === currentUser?.userId;
+                            return (
+                              <tr key={index} className="border-b border-gray-200 last:border-b-0">
+                                <td className="py-2 px-3 font-medium">{getUserDisplayName(result.userId)}</td>
+                                <td className="py-2 px-3 text-center">
+                                  {isCurrentUser ? (
+                                    <select
+                                      value={result.rsvpStatus || 'pending'}
+                                      onChange={(e) => handleRSVPChange(game.id, e.target.value)}
+                                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                                    >
+                                      <option value="yes">Yes</option>
+                                      <option value="no">No</option>
+                                      <option value="pending">Pending</option>
+                                    </select>
+                                  ) : (
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      result.rsvpStatus === 'yes' ? 'bg-green-100 text-green-800' :
+                                      result.rsvpStatus === 'no' ? 'bg-red-100 text-red-800' :
+                                      result.rsvpStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {result.rsvpStatus || 'Pending'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Recent Games */}
         <div className="bg-white rounded-lg shadow-lg">
           <div className="p-6 border-b border-gray-200">
@@ -667,7 +899,7 @@ const Changing500 = () => {
               <div className="p-6 text-center">
                 <p className="text-gray-500">Select a group to view games</p>
               </div>
-            ) : filteredGames.length === 0 ? (
+            ) : filteredGames.filter(game => !isGameInFuture(game.date, game.time)).length === 0 ? (
               <div className="p-6 text-center">
                 <p className="text-gray-500">No games recorded yet for {selectedGroup.name}</p>
                 {currentUser && (
@@ -675,11 +907,15 @@ const Changing500 = () => {
                 )}
               </div>
             ) : (
-              filteredGames.slice().reverse().map((game) => (
+              filteredGames
+                .filter(game => !isGameInFuture(game.date, game.time))
+                .slice().reverse().map((game) => (
                 <div key={game.id} className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-semibold text-lg">{game.date}</h3>
+                    <h3 className="font-semibold text-lg">
+                      {formatGameDateTime(game)}
+                    </h3>
                     <p className="text-gray-600">Game #{game.gameNumber}</p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -726,12 +962,21 @@ const Changing500 = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-300">
-                          <th className="text-left py-2 px-3">Pos</th>
+                          {!isGameInFuture(game.date, game.time) && (
+                            <th className="text-left py-2 px-3">Pos</th>
+                          )}
                           <th className="text-left py-2 px-3">Player</th>
-                          <th className="text-center py-2 px-3">Points</th>
-                          <th className="text-center py-2 px-3">Winnings</th>
-                          <th className="text-center py-2 px-3">Rebuys</th>
-                          <th className="text-center py-2 px-3">Best Hand</th>
+                          {!isGameInFuture(game.date, game.time) && (
+                            <>
+                              <th className="text-center py-2 px-3">Points</th>
+                              <th className="text-center py-2 px-3">Winnings</th>
+                              <th className="text-center py-2 px-3">Rebuys</th>
+                              <th className="text-center py-2 px-3">Best Hand</th>
+                            </>
+                          )}
+                          {isGameInFuture(game.date, game.time) && (
+                            <th className="text-center py-2 px-3">RSVP</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -747,33 +992,51 @@ const Changing500 = () => {
                             };
                             return (
                               <tr key={index} className={getRowColorClass()}>
-                                <td className="py-2 px-3 font-medium">
-                                  <div className="flex items-center gap-1">
-                                    {result.position === 1 && <Trophy className="w-3 h-3 text-yellow-600" />}
-                                    #{result.position}
-                                  </div>
-                                </td>
+                                {!isGameInFuture(game.date, game.time) && (
+                                  <td className="py-2 px-3 font-medium">
+                                    <div className="flex items-center gap-1">
+                                      {result.position === 1 && <Trophy className="w-3 h-3 text-yellow-600" />}
+                                      #{result.position}
+                                    </div>
+                                  </td>
+                                )}
                                 <td className="py-2 px-3 font-medium">{getUserDisplayName(result.userId)}</td>
-                                <td className="py-2 px-3 text-center text-blue-600 font-semibold">
-                                  {points.toFixed(1)}
-                                </td>
-                                <td className={`py-2 px-3 text-center font-medium ${
-                                  result.winnings >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  ${result.winnings.toFixed(0)}
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                  {result.rebuys > 0 ? result.rebuys : '-'}
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                  {result.bestHandWinner ? (
-                                    <span className="text-purple-600 font-semibold">Won</span>
-                                  ) : result.bestHandParticipant ? (
-                                    <span className="text-gray-600">Played</span>
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
+                                {!isGameInFuture(game.date, game.time) && (
+                                  <>
+                                    <td className="py-2 px-3 text-center text-blue-600 font-semibold">
+                                      {points.toFixed(1)}
+                                    </td>
+                                    <td className={`py-2 px-3 text-center font-medium ${
+                                      result.winnings >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      ${result.winnings.toFixed(0)}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      {result.rebuys > 0 ? result.rebuys : '-'}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      {result.bestHandWinner ? (
+                                        <span className="text-purple-600 font-semibold">Won</span>
+                                      ) : result.bestHandParticipant ? (
+                                        <span className="text-gray-600">Played</span>
+                                      ) : (
+                                        '-'
+                                      )}
+                                    </td>
+                                  </>
+                                )}
+                                {isGameInFuture(game.date, game.time) && (
+                                  <td className="py-2 px-3 text-center">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      result.rsvpStatus === 'yes' ? 'bg-green-100 text-green-800' :
+                                      result.rsvpStatus === 'no' ? 'bg-red-100 text-red-800' :
+                                      result.rsvpStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {result.rsvpStatus || 'Pending'}
+                                    </span>
+                                  </td>
+                                )}
                               </tr>
                             );
                           })}
@@ -816,6 +1079,15 @@ const Changing500 = () => {
                 />
               </div>
               <div>
+                  <label className="block text-sm font-medium mb-2">Time</label>
+                <input
+                  type="time"
+                    value={newGame.time || ''}
+                    onChange={(e) => updateGameData('time', e.target.value)}
+                    className="w-full max-w-md border rounded px-4 py-3 text-base"
+                />
+              </div>
+              <div>
                   <label className="block text-sm font-medium mb-2">Game Number</label>
                 <input
                   type="number"
@@ -843,61 +1115,79 @@ const Changing500 = () => {
                       loading={groupUsersLoading}
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div>
-                    <label className="block text-sm font-medium mb-2">Position</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={result.position}
-                    onChange={(e) => updatePlayerResult(index, 'position', e.target.value)}
-                      className="w-full border rounded px-3 py-2 text-base"
-                        required
-                  />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium mb-2">Winnings ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={result.winnings}
-                    onChange={(e) => updatePlayerResult(index, 'winnings', e.target.value)}
-                      className="w-full border rounded px-3 py-2 text-base"
-                  />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium mb-2">Rebuys</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={result.rebuys}
-                    onChange={(e) => updatePlayerResult(index, 'rebuys', e.target.value)}
-                      className="w-full border rounded px-3 py-2 text-base"
-                  />
-                </div>
-                <div>
-                      <label className="block text-sm font-medium mb-2">Best Hand</label>
-                      <div className="space-y-2">
-                        <label className="flex items-center text-sm">
-                          <input
-                            type="checkbox"
-                            checked={result.bestHandParticipant}
-                            onChange={(e) => updatePlayerResult(index, 'bestHandParticipant', e.target.checked)}
-                            className="mr-2"
-                          />
-                          Participated
-                        </label>
-                        <label className="flex items-center text-sm">
-                          <input
-                            type="checkbox"
-                            checked={result.bestHandWinner}
-                            onChange={(e) => updatePlayerResult(index, 'bestHandWinner', e.target.checked)}
-                            className="mr-2"
-                          />
-                          Won
-                        </label>
-                      </div>
+                <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 ${isGameInFuture(newGame.date, newGame.time) ? 'lg:grid-cols-2' : 'lg:grid-cols-5'}`}>
+                {!isGameInFuture(newGame.date, newGame.time) && (
+                  <>
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Position</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={result.position}
+                        onChange={(e) => updatePlayerResult(index, 'position', e.target.value)}
+                          className="w-full border rounded px-3 py-2 text-base"
+                            required
+                      />
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Winnings ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={result.winnings}
+                        onChange={(e) => updatePlayerResult(index, 'winnings', e.target.value)}
+                          className="w-full border rounded px-3 py-2 text-base"
+                      />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Rebuys</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={result.rebuys}
+                        onChange={(e) => updatePlayerResult(index, 'rebuys', e.target.value)}
+                          className="w-full border rounded px-3 py-2 text-base"
+                      />
+                    </div>
+                    <div>
+                          <label className="block text-sm font-medium mb-2">Best Hand</label>
+                          <div className="space-y-2">
+                            <label className="flex items-center text-sm">
+                              <input
+                                type="checkbox"
+                                checked={result.bestHandParticipant}
+                                onChange={(e) => updatePlayerResult(index, 'bestHandParticipant', e.target.checked)}
+                                className="mr-2"
+                              />
+                              Participated
+                            </label>
+                            <label className="flex items-center text-sm">
+                              <input
+                                type="checkbox"
+                                checked={result.bestHandWinner}
+                                onChange={(e) => updatePlayerResult(index, 'bestHandWinner', e.target.checked)}
+                                className="mr-2"
+                              />
+                              Won
+                            </label>
+                          </div>
+                        </div>
+                  </>
+                )}
+                {isGameInFuture(newGame.date, newGame.time) && (
+                  <div>
+                      <label className="block text-sm font-medium mb-2">RSVP Status</label>
+                    <select
+                      value={result.rsvpStatus || 'pending'}
+                      onChange={(e) => updatePlayerResult(index, 'rsvpStatus', e.target.value)}
+                        className="w-full border rounded px-3 py-2 text-base"
+                    >
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                )}
                     <div className="flex items-end">
                       {newGame.results.length > 1 && (
                   <button

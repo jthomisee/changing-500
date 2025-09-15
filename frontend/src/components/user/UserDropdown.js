@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, ChevronDown, Users } from 'lucide-react';
+import { User, Settings, LogOut, ChevronDown, Users, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, selectedGroup }) => {
+const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, selectedGroup, upcomingGames, onRSVPChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const { currentUser, handleUserLogout, isAdmin } = useAuth();
@@ -80,6 +80,41 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
   // Check if user can manage group members
   const canManageGroup = selectedGroup && (selectedGroup.userRole === 'owner' || isAdmin);
 
+  // Helper to format game time for display
+  const formatGameTime = (game) => {
+    if (!game.date) return '';
+    
+    if (game.time) {
+      // Convert UTC time to local time for display
+      const utcDateTime = new Date(`${game.date}T${game.time}:00.000Z`);
+      return utcDateTime.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+    
+    return new Date(game.date).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Handle RSVP change
+  const handleRSVPChange = (gameId, newStatus) => {
+    if (onRSVPChange) {
+      onRSVPChange(gameId, newStatus);
+    }
+  };
+
+  // Get user's RSVP status for a game
+  const getUserRSVP = (game) => {
+    const userResult = game.results?.find(r => r.userId === currentUser?.userId);
+    return userResult?.rsvpStatus || 'pending';
+  };
+
   if (!currentUser) {
     return null;
   }
@@ -112,7 +147,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           {/* User Info Header */}
           <div className="px-4 py-3 border-b border-gray-100">
             <p className="text-sm font-medium text-gray-900 truncate">
@@ -129,6 +164,56 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
               </span>
             )}
           </div>
+
+          {/* Upcoming Games Section */}
+          {upcomingGames && upcomingGames.length > 0 && (
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <h4 className="text-sm font-medium text-gray-900">Upcoming Games</h4>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {upcomingGames.slice(0, 3).map((game) => {
+                  const userRSVP = getUserRSVP(game);
+                  return (
+                    <div key={game.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                            <Clock className="w-3 h-3" />
+                            {formatGameTime(game)}
+                          </div>
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            Game #{game.gameNumber}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600">RSVP:</span>
+                        <select
+                          value={userRSVP}
+                          onChange={(e) => handleRSVPChange(game.id, e.target.value)}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                          <option value="pending">Pending</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+                {upcomingGames.length > 3 && (
+                  <div className="text-center">
+                    <span className="text-xs text-gray-500">
+                      +{upcomingGames.length - 3} more games
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Menu Items */}
           <div className="py-1">
