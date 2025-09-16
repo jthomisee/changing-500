@@ -80,18 +80,6 @@ resource "aws_api_gateway_resource" "users_reset_password_resource" {
   path_part   = "reset-password"
 }
 
-resource "aws_api_gateway_resource" "user_convert_stub_resource" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  parent_id   = aws_api_gateway_resource.user_manage_resource.id
-  path_part   = "convert-stub"
-}
-
-resource "aws_api_gateway_resource" "user_merge_stub_resource" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  parent_id   = aws_api_gateway_resource.user_manage_resource.id
-  path_part   = "merge-stub"
-}
-
 # Groups API Resources
 resource "aws_api_gateway_resource" "groups_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -129,12 +117,6 @@ resource "aws_api_gateway_resource" "group_users_resource" {
   path_part   = "users"
 }
 
-resource "aws_api_gateway_resource" "group_stub_users_resource" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  parent_id   = aws_api_gateway_resource.group_resource.id
-  path_part   = "stub-users"
-}
-
 # Notifications API Resources
 resource "aws_api_gateway_resource" "notifications_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -166,6 +148,25 @@ resource "aws_api_gateway_resource" "rsvp_game_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   parent_id   = aws_api_gateway_resource.rsvp_resource.id
   path_part   = "{gameId}"
+}
+
+# RSVP Token endpoints for no-login RSVP
+resource "aws_api_gateway_resource" "rsvp_token_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_rest_api.changing_500_api.root_resource_id
+  path_part   = "rsvp-token"
+}
+
+resource "aws_api_gateway_resource" "rsvp_token_detail_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.rsvp_token_resource.id
+  path_part   = "{token}"
+}
+
+resource "aws_api_gateway_resource" "rsvp_token_respond_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  path_part   = "respond"
 }
 
 # API Gateway Methods
@@ -282,36 +283,6 @@ resource "aws_api_gateway_method" "user_manage_delete_method" {
 resource "aws_api_gateway_method" "user_manage_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.user_manage_resource.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-# Convert Stub User Methods
-resource "aws_api_gateway_method" "user_convert_stub_put_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method   = "PUT"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_method" "user_convert_stub_options_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-# Merge Stub User Methods
-resource "aws_api_gateway_method" "user_merge_stub_post_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.user_merge_stub_resource.id
-  http_method   = "POST"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_method" "user_merge_stub_options_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.user_merge_stub_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -455,21 +426,6 @@ resource "aws_api_gateway_method" "group_users_options_method" {
   authorization = "NONE"
 }
 
-# Group Stub Users Methods
-resource "aws_api_gateway_method" "group_stub_users_post_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method   = "POST"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_method" "group_stub_users_options_method" {
-  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id   = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
 # Notification methods
 resource "aws_api_gateway_method" "notifications_queue_post_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
@@ -518,6 +474,35 @@ resource "aws_api_gateway_method" "rsvp_game_put_method" {
 resource "aws_api_gateway_method" "rsvp_game_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.rsvp_game_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# RSVP Token methods
+resource "aws_api_gateway_method" "rsvp_token_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "rsvp_token_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_token_respond_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "rsvp_token_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "rsvp_token_respond_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.rsvp_token_respond_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -694,54 +679,6 @@ resource "aws_api_gateway_integration" "user_manage_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.user_manage_resource.id
   http_method = aws_api_gateway_method.user_manage_options_method.http_method
-
-  type = "MOCK"
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
-}
-
-# Convert Stub User Integrations
-resource "aws_api_gateway_integration" "user_convert_stub_put_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method = aws_api_gateway_method.user_convert_stub_put_method.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.convert_stub_user.invoke_arn
-}
-
-resource "aws_api_gateway_integration" "user_convert_stub_options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method = aws_api_gateway_method.user_convert_stub_options_method.http_method
-
-  type = "MOCK"
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
-}
-
-# Merge Stub User Integrations
-resource "aws_api_gateway_integration" "user_merge_stub_post_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_merge_stub_resource.id
-  http_method = aws_api_gateway_method.user_merge_stub_post_method.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.merge_stub_user.invoke_arn
-}
-
-resource "aws_api_gateway_integration" "user_merge_stub_options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_merge_stub_resource.id
-  http_method = aws_api_gateway_method.user_merge_stub_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -971,30 +908,6 @@ resource "aws_api_gateway_integration" "group_users_options_integration" {
   }
 }
 
-# Group Stub Users Integrations
-resource "aws_api_gateway_integration" "group_stub_users_post_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method = aws_api_gateway_method.group_stub_users_post_method.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.create_stub_user.invoke_arn
-}
-
-resource "aws_api_gateway_integration" "group_stub_users_options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method = aws_api_gateway_method.group_stub_users_options_method.http_method
-
-  type = "MOCK"
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
-}
-
 # Notification integrations
 resource "aws_api_gateway_integration" "notifications_queue_post_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -1068,6 +981,53 @@ resource "aws_api_gateway_integration" "rsvp_game_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.rsvp_game_resource.id
   http_method = aws_api_gateway_method.rsvp_game_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# RSVP Token integrations
+resource "aws_api_gateway_integration" "rsvp_token_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_rsvp_token.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "rsvp_token_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_respond_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.update_rsvp_token.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "rsvp_token_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "rsvp_token_respond_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_respond_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_respond_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -1303,60 +1263,6 @@ resource "aws_api_gateway_integration_response" "user_manage_options_integration
   }
 }
 
-# Convert Stub User CORS
-resource "aws_api_gateway_method_response" "user_convert_stub_options_200" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method = aws_api_gateway_method.user_convert_stub_options_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "user_convert_stub_options_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_convert_stub_resource.id
-  http_method = aws_api_gateway_method.user_convert_stub_options_method.http_method
-  status_code = aws_api_gateway_method_response.user_convert_stub_options_200.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-}
-
-# Merge Stub User CORS
-resource "aws_api_gateway_method_response" "user_merge_stub_options_200" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_merge_stub_resource.id
-  http_method = aws_api_gateway_method.user_merge_stub_options_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "user_merge_stub_options_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.user_merge_stub_resource.id
-  http_method = aws_api_gateway_method.user_merge_stub_options_method.http_method
-  status_code = aws_api_gateway_method_response.user_merge_stub_options_200.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-}
-
 resource "aws_api_gateway_method_response" "users_profile_options_200" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.users_profile_resource.id
@@ -1568,33 +1474,6 @@ resource "aws_api_gateway_integration_response" "group_users_options_integration
   }
 }
 
-# Group Stub Users CORS
-resource "aws_api_gateway_method_response" "group_stub_users_options_200" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method = aws_api_gateway_method.group_stub_users_options_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "group_stub_users_options_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
-  resource_id = aws_api_gateway_resource.group_stub_users_resource.id
-  http_method = aws_api_gateway_method.group_stub_users_options_method.http_method
-  status_code = aws_api_gateway_method_response.group_stub_users_options_200.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-}
-
 # Notifications CORS
 resource "aws_api_gateway_method_response" "notifications_queue_options_200" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -1675,6 +1554,59 @@ resource "aws_api_gateway_integration_response" "rsvp_game_options_integration_r
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
+
+# RSVP Token CORS responses
+resource "aws_api_gateway_method_response" "rsvp_token_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "rsvp_token_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_detail_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_options_method.http_method
+  status_code = aws_api_gateway_method_response.rsvp_token_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "rsvp_token_respond_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_respond_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_respond_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "rsvp_token_respond_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.rsvp_token_respond_resource.id
+  http_method = aws_api_gateway_method.rsvp_token_respond_options_method.http_method
+  status_code = aws_api_gateway_method_response.rsvp_token_respond_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
   depends_on = [
@@ -1696,10 +1628,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration.user_manage_put_integration,
     aws_api_gateway_integration.user_manage_delete_integration,
     aws_api_gateway_integration.user_manage_options_integration,
-    aws_api_gateway_integration.user_convert_stub_put_integration,
-    aws_api_gateway_integration.user_convert_stub_options_integration,
-    aws_api_gateway_integration.user_merge_stub_post_integration,
-    aws_api_gateway_integration.user_merge_stub_options_integration,
+    
     aws_api_gateway_integration.users_profile_put_integration,
     aws_api_gateway_integration.users_profile_options_integration,
     aws_api_gateway_integration.users_password_put_integration,
@@ -1719,17 +1648,21 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration.group_member_options_integration,
     aws_api_gateway_integration.group_users_get_integration,
     aws_api_gateway_integration.group_users_options_integration,
-    aws_api_gateway_integration.group_stub_users_post_integration,
-    aws_api_gateway_integration.group_stub_users_options_integration,
+    
     aws_api_gateway_integration.notifications_queue_post_integration,
     aws_api_gateway_integration.notifications_queue_options_integration,
     aws_api_gateway_integration.rsvp_game_get_integration,
     aws_api_gateway_integration.rsvp_game_put_integration,
     aws_api_gateway_integration.rsvp_game_options_integration,
+    aws_api_gateway_integration.rsvp_token_get_integration,
+    aws_api_gateway_integration.rsvp_token_put_integration,
+    aws_api_gateway_integration.rsvp_token_options_integration,
+    aws_api_gateway_integration.rsvp_token_respond_options_integration,
+    aws_api_gateway_integration.twilio_webhook_post_integration,
+    aws_api_gateway_integration.twilio_webhook_options_integration,
     aws_api_gateway_integration_response.users_manage_options_integration_response,
     aws_api_gateway_integration_response.user_manage_options_integration_response,
-    aws_api_gateway_integration_response.user_convert_stub_options_integration_response,
-    aws_api_gateway_integration_response.user_merge_stub_options_integration_response,
+    
     aws_api_gateway_integration_response.users_profile_options_integration_response,
     aws_api_gateway_integration_response.users_password_options_integration_response,
     aws_api_gateway_integration_response.users_reset_password_options_integration_response,
@@ -1738,7 +1671,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration_response.group_members_options_integration_response,
     aws_api_gateway_integration_response.group_member_options_integration_response,
     aws_api_gateway_integration_response.group_users_options_integration_response,
-    aws_api_gateway_integration_response.group_stub_users_options_integration_response,
+    
   ]
 
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -1753,8 +1686,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_resource.users_search_resource.id,
       aws_api_gateway_resource.users_manage_resource.id,
       aws_api_gateway_resource.user_manage_resource.id,
-      aws_api_gateway_resource.user_convert_stub_resource.id,
-      aws_api_gateway_resource.user_merge_stub_resource.id,
+      
       aws_api_gateway_resource.users_profile_resource.id,
       aws_api_gateway_resource.users_password_resource.id,
       aws_api_gateway_resource.users_reset_password_resource.id,
@@ -1764,7 +1696,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_resource.group_members_resource.id,
       aws_api_gateway_resource.group_member_resource.id,
       aws_api_gateway_resource.group_users_resource.id,
-      aws_api_gateway_resource.group_stub_users_resource.id,
+      
       aws_api_gateway_method.get_games_method.id,
       aws_api_gateway_method.post_games_method.id,
       aws_api_gateway_method.put_game_method.id,
@@ -1783,10 +1715,6 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.user_manage_put_method.id,
       aws_api_gateway_method.user_manage_delete_method.id,
       aws_api_gateway_method.user_manage_options_method.id,
-      aws_api_gateway_method.user_convert_stub_put_method.id,
-      aws_api_gateway_method.user_convert_stub_options_method.id,
-      aws_api_gateway_method.user_merge_stub_post_method.id,
-      aws_api_gateway_method.user_merge_stub_options_method.id,
       aws_api_gateway_method.users_profile_put_method.id,
       aws_api_gateway_method.users_profile_options_method.id,
       aws_api_gateway_method.users_password_put_method.id,
@@ -1806,8 +1734,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.group_member_options_method.id,
       aws_api_gateway_method.group_users_get_method.id,
       aws_api_gateway_method.group_users_options_method.id,
-      aws_api_gateway_method.group_stub_users_post_method.id,
-      aws_api_gateway_method.group_stub_users_options_method.id,
+      
       aws_api_gateway_integration.get_games_integration.id,
       aws_api_gateway_integration.post_games_integration.id,
       aws_api_gateway_integration.put_game_integration.id,
@@ -1845,8 +1772,6 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration.group_member_options_integration.id,
       aws_api_gateway_method_response.users_manage_options_200.id,
       aws_api_gateway_method_response.user_manage_options_200.id,
-      aws_api_gateway_method_response.user_convert_stub_options_200.id,
-      aws_api_gateway_method_response.user_merge_stub_options_200.id,
       aws_api_gateway_method_response.users_profile_options_200.id,
       aws_api_gateway_method_response.users_password_options_200.id,
       aws_api_gateway_method_response.users_reset_password_options_200.id,
@@ -1855,7 +1780,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method_response.group_members_options_200.id,
       aws_api_gateway_method_response.group_member_options_200.id,
       aws_api_gateway_method_response.group_users_options_200.id,
-      aws_api_gateway_method_response.group_stub_users_options_200.id,
+      
       aws_api_gateway_method_response.notifications_queue_options_200.id,
       aws_api_gateway_method_response.rsvp_game_options_200.id,
       aws_api_gateway_integration_response.users_manage_options_integration_response.id,
@@ -1867,9 +1792,20 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration_response.group_join_options_integration_response.id,
       aws_api_gateway_integration_response.group_members_options_integration_response.id,
       aws_api_gateway_integration_response.group_member_options_integration_response.id,
-      aws_api_gateway_integration_response.group_stub_users_options_integration_response.id,
+      
       aws_api_gateway_integration_response.notifications_queue_options_integration_response.id,
       aws_api_gateway_integration_response.rsvp_game_options_integration_response.id,
+      aws_api_gateway_method_response.rsvp_token_options_200.id,
+      aws_api_gateway_method_response.rsvp_token_respond_options_200.id,
+      aws_api_gateway_integration_response.rsvp_token_options_integration_response.id,
+      aws_api_gateway_integration_response.rsvp_token_respond_options_integration_response.id,
+      aws_api_gateway_resource.twilio_webhook_resource.id,
+      aws_api_gateway_method.twilio_webhook_post_method.id,
+      aws_api_gateway_method.twilio_webhook_options_method.id,
+      aws_api_gateway_integration.twilio_webhook_post_integration.id,
+      aws_api_gateway_integration.twilio_webhook_options_integration.id,
+      aws_api_gateway_method_response.twilio_webhook_options_200.id,
+      aws_api_gateway_integration_response.twilio_webhook_options_integration_response.id,
     ]))
   }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const initialResult = { 
   userId: '',
@@ -18,6 +19,7 @@ const initialGameState = {
 };
 
 export const useGameForm = () => {
+  const { currentUser } = useAuth();
   const [showAddGame, setShowAddGame] = useState(false);
   const [editingGame, setEditingGame] = useState(null);
   const [newGame, setNewGame] = useState(initialGameState);
@@ -29,23 +31,42 @@ export const useGameForm = () => {
     setShowAddGame(true);
   };
 
-  // Helper function to convert UTC datetime from database to local time for editing
+  // Helper function to convert UTC datetime from database to user timezone for editing
   const convertFromUTCForEditing = (utcDate, utcTime) => {
     if (!utcDate) return { date: '', time: '' };
-    
+
     if (utcTime) {
-      // Create a UTC date object
-      const utcDateTime = new Date(`${utcDate}T${utcTime}:00.000Z`);
-      // Convert to local timezone
-      const localDate = utcDateTime.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-      const localTime = utcDateTime.toLocaleTimeString('en-GB', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }); // HH:MM format
-      return { date: localDate, time: localTime };
+      try {
+        // Get user's timezone preference, default to America/New_York
+        const userTimezone = currentUser?.timezone || 'America/New_York';
+
+        // Create a UTC date object
+        const utcDateTime = new Date(`${utcDate}T${utcTime}:00.000Z`);
+
+        // Convert to user's timezone
+        const userDate = utcDateTime.toLocaleDateString('en-CA', { timeZone: userTimezone }); // YYYY-MM-DD format
+        const userTime = utcDateTime.toLocaleTimeString('en-GB', {
+          timeZone: userTimezone,
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        }); // HH:MM format
+
+        return { date: userDate, time: userTime };
+      } catch (error) {
+        console.error('Error converting UTC to user timezone for editing:', error);
+        // Fallback to local timezone
+        const utcDateTime = new Date(`${utcDate}T${utcTime}:00.000Z`);
+        const localDate = utcDateTime.toLocaleDateString('en-CA');
+        const localTime = utcDateTime.toLocaleTimeString('en-GB', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        return { date: localDate, time: localTime };
+      }
     }
-    
+
     return { date: utcDate, time: '' };
   };
 

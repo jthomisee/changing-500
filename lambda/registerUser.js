@@ -138,7 +138,6 @@ exports.handler = async (event) => {
       phone: phone ? phone.replace(/\D/g, '') : null, // Store phone as digits only
       password: hashedPassword,
       isAdmin: Boolean(isAdmin),
-      isStub: false,
       createdAt: now,
       updatedAt: now
     };

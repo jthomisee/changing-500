@@ -45,6 +45,9 @@ export const calculateSeasonStandings = (games, users = []) => {
   const completedGames = games.filter(game => game.status !== 'scheduled');
 
   completedGames.forEach(game => {
+    // Use the game's configured buy-in amount, default to $20 if not set
+    const gameBuyinAmount = game.buyin || 20;
+
     // Calculate best hand pot for this game
     const bestHandParticipants = game.results.filter(r => r.bestHandParticipant);
     const bestHandWinners = game.results.filter(r => r.bestHandWinner);
@@ -75,7 +78,6 @@ export const calculateSeasonStandings = (games, users = []) => {
           lastName: 'User',
           email: `unknown-${userId.slice(-8)}@placeholder.com`,
           displayName: `Unknown User (${userId.slice(-8)})`,
-          isStub: false,
           isPlaceholder: true // Flag to indicate this is a placeholder
         };
         // Add to lookup to avoid creating duplicates
@@ -102,14 +104,15 @@ export const calculateSeasonStandings = (games, users = []) => {
       const stats = playerStats[userId];
       stats.games++;
       stats.totalWinnings += result.winnings;
-      stats.totalBuyins += (20 + (result.rebuys * 20)); // $20 buyin + $20 per rebuy
+      stats.totalBuyins += (gameBuyinAmount + (result.rebuys * gameBuyinAmount)); // Use game's buyin + rebuy amounts
       stats.points += calculatePoints(game.results, result);
       stats.gameHistory.push({
         date: game.date,
         position: result.position,
         winnings: result.winnings,
         rebuys: result.rebuys,
-        points: calculatePoints(game.results, result)
+        points: calculatePoints(game.results, result),
+        buyin: gameBuyinAmount // Track the buy-in for this specific game
       });
 
       if (result.position === 1 || result.position === 2) {
@@ -251,4 +254,41 @@ export const validateGameData = (gameData) => {
   }
 
   return errors;
+};
+
+// Check if a game is scheduled (not completed)
+export const isGameScheduled = (game) => {
+  return game.status === 'scheduled';
+};
+
+// Get RSVP status display info
+export const getRSVPStatusInfo = (status) => {
+  const statusMap = {
+    yes: { label: 'Yes', className: 'bg-green-100 text-green-800' },
+    no: { label: 'No', className: 'bg-red-100 text-red-800' },
+    pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+    default: { label: 'Pending', className: 'bg-gray-100 text-gray-800' }
+  };
+
+  return statusMap[status] || statusMap.default;
+};
+
+// Sort RSVP results by status (yes, pending, no)
+export const sortRSVPResults = (results) => {
+  const order = { yes: 0, pending: 1, no: 2 };
+  return results.slice().sort((a, b) => {
+    return (order[a.rsvpStatus] || 1) - (order[b.rsvpStatus] || 1);
+  });
+};
+
+// Sort game results by position
+export const sortGameResultsByPosition = (results) => {
+  return results.slice().sort((a, b) => a.position - b.position);
+};
+
+// Get row color class for game results display
+export const getResultRowColorClass = (position) => {
+  if (position === 1) return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-b border-gray-200 last:border-b-0';
+  if (position === 2) return 'bg-gradient-to-r from-slate-200 to-slate-100 border-b border-gray-200 last:border-b-0';
+  return 'border-b border-gray-200 last:border-b-0';
 };

@@ -99,7 +99,7 @@ exports.handler = async (event) => {
       };
 
     } else if (event.httpMethod === 'POST') {
-      // Create stub user from game creation (admin authenticated)
+      // Create user from game creation (admin authenticated)
       const authResult = await verifyAuthHeader(event.headers?.Authorization || event.headers?.authorization);
       if (!authResult.valid || !authResult.payload.isAdmin) {
         return {
@@ -128,25 +128,24 @@ exports.handler = async (event) => {
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
-      // Create stub user
+      // Create user (requires admin; this path is for manual creation, but we now generally create via group add)
       const userId = uuidv4();
       const now = new Date().toISOString();
       
-      const stubUser = {
+      const newUser = {
         userId,
         email: email ? email.toLowerCase() : null,
         firstName,
         lastName,
         phone: null,
-        password: null, // No password for stub users
-        isStub: true,
+        password: null,
         createdAt: now,
         updatedAt: now
       };
 
       const putParams = {
         TableName: USERS_TABLE,
-        Item: stubUser
+        Item: newUser
       };
 
       await dynamodb.send(new PutCommand(putParams));
@@ -155,9 +154,9 @@ exports.handler = async (event) => {
         statusCode: 201,
         headers,
         body: JSON.stringify({
-          message: 'Stub user created successfully',
+          message: 'User created successfully',
           user: {
-            ...stubUser,
+            ...newUser,
             displayName: `${firstName} ${lastName}`
           }
         })

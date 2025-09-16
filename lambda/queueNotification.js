@@ -16,12 +16,24 @@ const GAMES_TABLE = process.env.GAMES_TABLE_NAME;
 const GROUPS_TABLE = process.env.GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin': event.headers?.origin || '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'false'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
   try {
     const { gameId, notificationType, triggeredBy } = JSON.parse(event.body || '{}');
 
     if (!gameId || !notificationType) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'gameId and notificationType are required' })
       };
     }
@@ -31,6 +43,7 @@ exports.handler = async (event) => {
     if (!game) {
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ error: 'Game not found' })
       };
     }
@@ -40,6 +53,7 @@ exports.handler = async (event) => {
     if (!group) {
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ error: 'Group not found' })
       };
     }
@@ -55,7 +69,8 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ 
+      headers,
+      body: JSON.stringify({
         message: `Queued ${notificationCount} notifications`,
         gameId,
         notificationType
@@ -66,6 +81,7 @@ exports.handler = async (event) => {
     console.error('Error queuing notifications:', error);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ error: 'Internal server error' })
     };
   }
@@ -80,9 +96,10 @@ async function queueGameInvitationNotifications(game, group) {
     return count;
   }
 
-  // Get all users invited to this game
-  const userIds = game.results?.map(r => r.userId) || [];
-  
+  // Get only users with pending RSVP status
+  const pendingUsers = game.results?.filter(r => r.rsvpStatus === 'pending') || [];
+  const userIds = pendingUsers.map(r => r.userId);
+
   for (const userId of userIds) {
     const user = await getUser(userId);
     if (!user) continue;
@@ -103,6 +120,8 @@ async function queueGameInvitationNotifications(game, group) {
         groupName: group.name,
         gameDate: game.date,
         gameTime: game.time,
+        location: game.location,
+        buyin: game.buyin,
         rsvpToken
       });
       count++;
@@ -156,7 +175,9 @@ async function queueGameResultsNotifications(game, group) {
         gameId: game.id,
         groupName: group.name,
         gameDate: game.date,
-        gameTime: game.time
+        gameTime: game.time,
+        location: game.location,
+        buyin: game.buyin
       });
       count++;
     }

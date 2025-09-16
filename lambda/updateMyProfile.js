@@ -45,10 +45,10 @@ exports.handler = async (event) => {
       };
     }
 
-    const { firstName, lastName, email, phone, notificationPreferences } = JSON.parse(event.body || '{}');
+    const { firstName, lastName, email, phone, timezone, notificationPreferences } = JSON.parse(event.body || '{}');
     
     // If updating notification preferences only, skip validation of other fields
-    if (!notificationPreferences) {
+    if (!notificationPreferences && !(timezone && !firstName && !lastName && !email)) {
       // Validate required fields for profile updates
       if (!firstName || !lastName || !email) {
         return {
@@ -120,20 +120,31 @@ exports.handler = async (event) => {
     const expressionAttributeValues = {
       ':updatedAt': now
     };
+    const expressionAttributeNames = {};
 
     if (notificationPreferences) {
       // Only updating notification preferences
       updateExpression += ', notificationPreferences = :notificationPreferences';
       expressionAttributeValues[':notificationPreferences'] = notificationPreferences;
+      if (typeof timezone !== 'undefined') {
+        updateExpression += ', #timezone = :timezone';
+        expressionAttributeNames['#timezone'] = 'timezone';
+        expressionAttributeValues[':timezone'] = timezone;
+      }
     } else {
       // Updating profile fields
       updateExpression += ', firstName = :firstName, lastName = :lastName, email = :email, phone = :phone';
+      if (typeof timezone !== 'undefined') {
+        updateExpression += ', #timezone = :timezone';
+        expressionAttributeNames['#timezone'] = 'timezone';
+        expressionAttributeValues[':timezone'] = timezone;
+      }
       expressionAttributeValues[':firstName'] = firstName;
       expressionAttributeValues[':lastName'] = lastName;
       expressionAttributeValues[':email'] = email.toLowerCase();
       expressionAttributeValues[':phone'] = phone || null;
     }
-    
+
     const updateParams = {
       TableName: USERS_TABLE,
       Key: { userId: requestingUserId },
@@ -141,6 +152,11 @@ exports.handler = async (event) => {
       ExpressionAttributeValues: expressionAttributeValues,
       ReturnValues: 'ALL_NEW'
     };
+
+    // Only add ExpressionAttributeNames if we have any
+    if (Object.keys(expressionAttributeNames).length > 0) {
+      updateParams.ExpressionAttributeNames = expressionAttributeNames;
+    }
 
     const result = await dynamodb.send(new UpdateCommand(updateParams));
     

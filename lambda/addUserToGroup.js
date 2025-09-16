@@ -63,6 +63,17 @@ exports.handler = async (event) => {
       };
     }
 
+    // Enforce contact requirement
+    if (!email && !phone) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Either email or phone number is required'
+        })
+      };
+    }
+
     const requestingUserId = authResult.payload.userId;
     const isAdmin = authResult.payload.isAdmin || false;
 
@@ -90,8 +101,6 @@ exports.handler = async (event) => {
 
     // Step 1: Search for existing user by email or phone if provided
     if (email || phone) {
-      console.log('Searching for existing user by email/phone...');
-      
       if (email) {
         const emailQuery = {
           TableName: USERS_TABLE,
@@ -128,15 +137,12 @@ exports.handler = async (event) => {
 
     // Step 2: If user found, add them to the group (if not already a member)
     if (isExistingUser) {
-      
-      // Check if user is already in the group
       const existingMembership = await dynamodb.send(new GetCommand({
         TableName: USER_GROUPS_TABLE,
         Key: { userId: user.userId, groupId }
       }));
 
       if (!existingMembership.Item) {
-        // Add user to group as member
         const membershipParams = {
           TableName: USER_GROUPS_TABLE,
           Item: {
@@ -147,20 +153,16 @@ exports.handler = async (event) => {
           }
         };
         await dynamodb.send(new PutCommand(membershipParams));
-      } else {
-        console.log('User already in group');
       }
     } else if (email || phone) {
       // Step 3: Create full account if email/phone provided but user not found
-      
-      // Generate secure random password
       const randomPassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(randomPassword, saltRounds);
-      
+
       const newUserId = uuidv4();
       const now = new Date().toISOString();
-      
+
       user = {
         userId: newUserId,
         email: email ? email.toLowerCase() : null,
@@ -169,109 +171,50 @@ exports.handler = async (event) => {
         phone: phone ? phone.replace(/\D/g, '') : null,
         password: hashedPassword,
         isAdmin: false,
-        isStub: false, // This is a full account
         createdAt: now,
         updatedAt: now
       };
 
-      const createUserParams = {
-        TableName: USERS_TABLE,
-        Item: user
-      };
-      await dynamodb.send(new PutCommand(createUserParams));
-      
-      // Add user to group as member
-      const membershipParams = {
+      await dynamodb.send(new PutCommand({ TableName: USERS_TABLE, Item: user }));
+
+      await dynamodb.send(new PutCommand({
         TableName: USER_GROUPS_TABLE,
-        Item: {
-          userId: newUserId,
-          groupId,
-          role: 'member',
-          joinedAt: now
-        }
-      };
-      await dynamodb.send(new PutCommand(membershipParams));
-      
+        Item: { userId: newUserId, groupId, role: 'member', joinedAt: now }
+      }));
+
       isFullAccount = true;
-      console.log('Created full account and added to group:', newUserId);
-      // Note: We don't return the password to the client for security
-    } else {
-      // Step 4: Create stub account (current behavior) if no email/phone provided
-      console.log('Creating stub account...');
-      
-      const stubUserId = uuidv4();
-      const now = new Date().toISOString();
-      
-      user = {
-        userId: stubUserId,
-        firstName: firstName?.trim() || '',
-        lastName: lastName?.trim() || '',
-        phone: phone?.trim() || null,
-        email: null,
-        password: null, // No password for stub users
-        isAdmin: false,
-        isStub: true,
-        createdAt: now,
-        updatedAt: now
-      };
-
-      const createStubParams = {
-        TableName: USERS_TABLE,
-        Item: user
-      };
-      await dynamodb.send(new PutCommand(createStubParams));
-      
-      // Add stub user to group as member
-      const membershipParams = {
-        TableName: USER_GROUPS_TABLE,
-        Item: {
-          userId: stubUserId,
-          groupId,
-          role: 'member',
-          joinedAt: now
-        }
-      };
-      await dynamodb.send(new PutCommand(membershipParams));
-      
-      console.log('Created stub account and added to group:', stubUserId);
+      // Note: Do not return password
     }
 
-    // User creation and group membership already handled above
-
-    // Return success response with user data (without password)
     const { password: _, ...userResponse } = user;
-    const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User';
+    const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User';
     
     return {
       statusCode: isExistingUser ? 200 : 201,
       headers,
       body: JSON.stringify({
         success: true,
-        message: isExistingUser ? 'Existing user added to group' : 
-                 isFullAccount ? 'Full account created and added to group' :
-                 'Guest account created and added to group',
+        message: isExistingUser ? 'Existing user added to group' : 'Full account created and added to group',
         user: {
           ...userResponse,
           displayName
         },
         isExistingUser,
-        isFullAccount,
-        isGuestAccount: !isExistingUser && !isFullAccount
+        isFullAccount
       })
     };
 
   } catch (error) {
-    console.error('Error creating stub user:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error message:', error.message);
-    
+    console.error('Error adding user to group:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: 'Internal server error',
-        details: error.message // Add error details for debugging
+        details: error.message
       })
     };
   }
 };
+
+

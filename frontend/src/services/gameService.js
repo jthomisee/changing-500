@@ -11,6 +11,16 @@ export const loadGames = async () => {
   }
 };
 
+export const loadScheduledGames = async () => {
+  try {
+    const response = await apiCall('/games?status=scheduled');
+    return response.games || [];
+  } catch (error) {
+    console.error('Failed to load scheduled games:', error);
+    throw error;
+  }
+};
+
 export const saveGameToDB = async (gameData) => {
   try {
     return await apiCall('/games', {

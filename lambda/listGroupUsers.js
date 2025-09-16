@@ -88,7 +88,7 @@ exports.handler = async (event) => {
           RequestItems: {
             [USERS_TABLE]: {
               Keys: [{ userId: userId }],
-              ProjectionExpression: 'userId, firstName, lastName, email, isStub, createdAt'
+              ProjectionExpression: 'userId, firstName, lastName, email, createdAt'
             }
           }
         }));
@@ -101,7 +101,6 @@ exports.handler = async (event) => {
             lastName: adminUser.lastName || '',
             displayName: `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'Unknown User',
             email: adminUser.email || '',
-            isStub: adminUser.isStub || false,
             createdAt: adminUser.createdAt
           };
 
@@ -139,7 +138,7 @@ exports.handler = async (event) => {
       RequestItems: {
         [USERS_TABLE]: {
           Keys: userIds,
-          ProjectionExpression: 'userId, firstName, lastName, email, isStub, createdAt'
+          ProjectionExpression: 'userId, firstName, lastName, email, createdAt'
         }
       }
     }));
@@ -153,19 +152,11 @@ exports.handler = async (event) => {
       lastName: user.lastName || '',
       displayName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User',
       email: user.email || '',
-      isStub: user.isStub || false,
       createdAt: user.createdAt
     }));
 
-    // Sort users: non-stub users first, then by name
-    formattedUsers.sort((a, b) => {
-      // Non-stub users first
-      if (a.isStub && !b.isStub) return 1;
-      if (!a.isStub && b.isStub) return -1;
-      
-      // Then by display name
-      return a.displayName.localeCompare(b.displayName);
-    });
+    // Sort users by name
+    formattedUsers.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
     return {
       statusCode: 200,

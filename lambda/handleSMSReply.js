@@ -1,7 +1,14 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
-const { DynamoDBDocumentClient, GetCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, UpdateCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const twilio = require('twilio');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+
+// Configure Day.js plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
@@ -82,8 +89,20 @@ async function processSMSReply(message) {
 
     // Parse the reply
     const reply = messageBody.trim().toLowerCase();
+
+    // Handle STOP command for SMS opt-out
+    if (['stop', 'unsubscribe', 'opt-out', 'optout'].includes(reply)) {
+      await handleSMSOptOut(user, originationNumber);
+      return;
+    }
+
+    // Handle HELP command
+    if (['help', 'info'].includes(reply)) {
+      await sendHelpMessage(originationNumber);
+      return;
+    }
+
     let rsvpStatus = null;
-    
     if (['yes', 'y', 'confirm', 'confirmed'].includes(reply)) {
       rsvpStatus = 'yes';
     } else if (['no', 'n', 'decline', 'declined'].includes(reply)) {
@@ -94,10 +113,19 @@ async function processSMSReply(message) {
       return;
     }
 
-    // Find the most recent game invitation for this user
-    const game = await findRecentGameInvitation(user.userId);
+    // Check if user has multiple pending RSVPs
+    const pendingRSVPCount = await countPendingRSVPs(user.userId);
+
+    if (pendingRSVPCount > 1) {
+      // User has multiple pending RSVPs - redirect them to the link
+      await sendMultipleRSVPMessage(originationNumber);
+      return;
+    }
+
+    // Find the single pending game invitation for this user
+    const game = await findSinglePendingGameInvitation(user.userId);
     if (!game) {
-      await sendErrorMessage(originationNumber, "No recent game invitation found.");
+      await sendErrorMessage(originationNumber, "No pending game invitation found. Check https://changing500.com/rsvp to see your upcoming games and update your RSVP.");
       return;
     }
 
@@ -105,7 +133,7 @@ async function processSMSReply(message) {
     await updateGameRSVP(game.id, user.userId, rsvpStatus);
 
     // Send confirmation
-    await sendRSVPConfirmation(originationNumber, rsvpStatus, game);
+    await sendRSVPConfirmation(originationNumber, rsvpStatus, game, user);
 
     console.log(`RSVP updated: ${user.userId} -> ${rsvpStatus} for game ${game.id}`);
 
@@ -138,29 +166,39 @@ async function findUserByPhone(phoneNumber) {
   }
 }
 
-async function findRecentGameInvitation(userId) {
+async function findSinglePendingGameInvitation(userId) {
   try {
-    // Get all games and find the most recent scheduled game this user is invited to
+    // Query scheduled games via GSI to find the single game this user has a pending RSVP for
     const params = {
-      TableName: GAMES_TABLE
+      TableName: GAMES_TABLE,
+      IndexName: 'status-date-index',
+      KeyConditionExpression: '#status = :scheduled',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':scheduled': 'scheduled' },
+      ScanIndexForward: true
     };
 
     const result = await dynamodb.send(new QueryCommand(params));
     const games = result.Items || [];
 
-    // Filter for scheduled games where user is invited
-    const eligibleGames = games
-      .filter(game => game.status === 'scheduled')
-      .filter(game => game.results?.some(r => r.userId === userId))
-      .sort((a, b) => {
-        const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
-        const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
-        return bDateTime - aDateTime; // Most recent first
-      });
+    console.log(`Found ${games.length} total games for user ${userId}`);
+
+    // Filter for games where user has pending RSVP
+    const eligibleGames = games.filter(game =>
+      game.results?.some(r => {
+        const match = r.userId === userId && r.rsvpStatus === 'pending';
+        if (r.userId === userId) {
+          console.log(`User ${userId} found in game ${game.id} with RSVP status: ${r.rsvpStatus}`);
+        }
+        return match;
+      })
+    );
+
+    console.log(`Found ${eligibleGames.length} eligible games with pending RSVP for user ${userId}`);
 
     return eligibleGames[0] || null;
   } catch (error) {
-    console.error('Error finding recent game invitation:', error);
+    console.error('Error finding pending game invitation:', error);
     return null;
   }
 }
@@ -204,26 +242,109 @@ async function updateGameRSVP(gameId, userId, rsvpStatus) {
   }
 }
 
-async function sendRSVPConfirmation(phoneNumber, rsvpStatus, game) {
-  const formattedTime = formatGameTime(game.date, game.time);
-  
+async function sendRSVPConfirmation(phoneNumber, rsvpStatus, game, user) {
+  // Use the user's timezone preference for consistent time formatting
+  const userTimezone = user?.timezone || 'America/New_York';
+  const formattedTime = formatGameTime(game.date, game.time, userTimezone);
+
   let message;
   if (rsvpStatus === 'yes') {
-    message = `Great! You're confirmed for poker night ${formattedTime}.`;
+    message = `Great! You're confirmed for poker night ${formattedTime} at ${game.location}.`;
   } else {
-    message = `Got it! You're marked as not attending poker night ${formattedTime}.`;
+    message = `Got it! You're marked as not attending poker night ${formattedTime} at ${game.location}.`;
   }
 
   await sendSMS(phoneNumber, message);
 }
 
+async function handleSMSOptOut(user, phoneNumber) {
+  try {
+    // Update user's notification preferences to disable SMS notifications
+    const updatedPreferences = {
+      ...user.notificationPreferences,
+      gameInvitations: {
+        ...user.notificationPreferences?.gameInvitations,
+        sms: false
+      },
+      gameResults: {
+        ...user.notificationPreferences?.gameResults,
+        sms: false
+      }
+    };
+
+    // Update user record in DynamoDB
+    await dynamodb.send(new UpdateCommand({
+      TableName: USERS_TABLE,
+      Key: { userId: user.userId },
+      UpdateExpression: 'SET notificationPreferences = :prefs, updatedAt = :updatedAt',
+      ExpressionAttributeValues: {
+        ':prefs': updatedPreferences,
+        ':updatedAt': new Date().toISOString()
+      }
+    }));
+
+    // Send confirmation message
+    const message = "You have been unsubscribed from SMS notifications from Changing 500. " +
+                   "You can re-enable SMS notifications anytime in your profile settings at changing500.com. " +
+                   "You will continue to receive email notifications if enabled.";
+
+    await sendSMS(phoneNumber, message);
+    console.log(`SMS opt-out processed for user ${user.userId}`);
+
+  } catch (error) {
+    console.error('Error processing SMS opt-out:', error);
+    const errorMessage = "Sorry, we couldn't process your unsubscribe request right now. " +
+                        "Please try again later or visit changing500.com to update your settings.";
+    await sendSMS(phoneNumber, errorMessage);
+  }
+}
+
 async function sendHelpMessage(phoneNumber) {
-  const message = "Reply YES to confirm or NO to decline your poker game invitation.";
+  const message = "Changing 500 SMS Help:\n" +
+                 "• Reply YES to confirm game invitation\n" +
+                 "• Reply NO to decline invitation\n" +
+                 "• Reply STOP to unsubscribe\n" +
+                 "• Visit changing500.com for more options";
   await sendSMS(phoneNumber, message);
 }
 
 async function sendErrorMessage(phoneNumber, errorMsg) {
   await sendSMS(phoneNumber, errorMsg);
+}
+
+async function sendMultipleRSVPMessage(phoneNumber) {
+  const message = "You have multiple pending game invitations. Please visit https://changing500.com/rsvp to respond to each invitation.";
+  await sendSMS(phoneNumber, message);
+}
+
+async function countPendingRSVPs(userId) {
+  try {
+    // Query scheduled games via GSI and count those with pending RSVPs for this user
+    const params = {
+      TableName: GAMES_TABLE,
+      IndexName: 'status-date-index',
+      KeyConditionExpression: '#status = :scheduled',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':scheduled': 'scheduled' },
+      ScanIndexForward: true
+    };
+
+    const result = await dynamodb.send(new QueryCommand(params));
+    const games = result.Items || [];
+
+    // Count games where user has pending RSVP
+    const pendingCount = games
+      .filter(game => {
+        const userResult = game.results?.find(r => r.userId === userId);
+        return userResult && (!userResult.rsvpStatus || userResult.rsvpStatus === 'pending');
+      })
+      .length;
+
+    return pendingCount;
+  } catch (error) {
+    console.error('Error counting pending RSVPs:', error);
+    return 0; // Default to 0 on error, which allows SMS replies
+  }
 }
 
 async function sendSMS(phoneNumber, message) {
@@ -245,25 +366,19 @@ async function sendSMS(phoneNumber, message) {
   }
 }
 
-function formatGameTime(gameDate, gameTime) {
+function formatGameTime(gameDate, gameTime, userTimezone = 'America/New_York') {
   if (!gameDate) return '';
-  if (!gameTime) return gameDate;
+  if (!gameTime) return gameDate; // Just the date
 
   try {
-    const [hourPart, minutePart = '00'] = String(gameTime).split(':');
-    let hour24 = parseInt(hourPart, 10);
-    let minutes = parseInt(minutePart, 10) || 0;
+    // Parse the UTC time stored in the database and convert to user's timezone
+    const utcDateTime = dayjs.utc(`${gameDate} ${gameTime}`);
+    const userDateTime = utcDateTime.tz(userTimezone);
 
-    const ampm = hour24 >= 12 ? 'PM' : 'AM';
-    let hour12 = hour24 % 12;
-    if (hour12 === 0) hour12 = 12;
-
-    const timeStr = minutes > 0
-      ? `${hour12}:${String(minutes).padStart(2, '0')} ${ampm}`
-      : `${hour12} ${ampm}`;
-
-    return `${gameDate}, ${timeStr}`;
+    // Format in a readable way
+    return userDateTime.format('ddd, MMM D, h:mm A');
   } catch (error) {
-    return `${gameDate}`;
+    console.error('Error formatting game time with Day.js:', error);
+    return `${gameDate}${gameTime ? ` at ${gameTime}` : ''}`;
   }
 }

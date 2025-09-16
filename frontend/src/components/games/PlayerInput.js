@@ -8,7 +8,7 @@ const PlayerInput = ({
   groupUsers = [], 
   allResults = [],
   onPlayerChange, 
-  onAddStubUser,
+  onAddGroupUser,
   loading = false
 }) => {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -19,6 +19,7 @@ const PlayerInput = ({
     phone: ''
   });
   const [creatingPlayer, setCreatingPlayer] = useState(false);
+  const [error, setError] = useState('');
 
   const handlePlayerSelect = (e) => {
     const selectedUserId = e.target.value;
@@ -42,10 +43,16 @@ const PlayerInput = ({
     e.stopPropagation(); // Prevent event bubbling to parent form
     
     if (!newPlayerForm.firstName.trim() && !newPlayerForm.lastName.trim()) {
-      alert('Please enter at least a first name or last name');
+      setError('Please enter at least a first name or last name');
       return;
     }
 
+    if (!newPlayerForm.email.trim() && !newPlayerForm.phone.trim()) {
+      setError('Please provide either an email address or phone number');
+      return;
+    }
+
+    setError('');
     setCreatingPlayer(true);
     try {
       const playerData = {
@@ -55,7 +62,7 @@ const PlayerInput = ({
         phone: newPlayerForm.phone.trim() || null
       };
       
-      const result = await onAddStubUser(playerData);
+      const result = await onAddGroupUser(playerData);
 
       if (result.success) {
         // Select the user by userId (whether found existing or newly created)        
@@ -64,22 +71,21 @@ const PlayerInput = ({
         // Reset form and close modal
         setNewPlayerForm({ firstName: '', lastName: '', email: '', phone: '' });
         setShowAddPlayer(false);
+        setError('');
         
         // Show success message based on what happened
         if (result.isExistingUser) {
           console.log('Successfully added existing user to game');
         } else if (result.isFullAccount) {
-          console.log('Successfully created full account and added to game');
-        } else {
-          console.log('Successfully created guest account and added to game');
+          console.log('Successfully created account and added to game');
         }
       } else {
         console.error('Failed to create/find player:', result.error);
-        alert('Failed to add player: ' + result.error);
+        setError('Failed to add player: ' + result.error);
       }
     } catch (error) {
       console.error('Error creating/finding player:', error);
-      alert('Failed to add player: ' + error.message);
+      setError('Failed to add player: ' + error.message);
     } finally {
       setCreatingPlayer(false);
     }
@@ -88,6 +94,7 @@ const PlayerInput = ({
   const handleAddPlayerCancel = () => {
     setNewPlayerForm({ firstName: '', lastName: '', email: '', phone: '' });
     setShowAddPlayer(false);
+    setError('');
   };
 
   // Get current selected user ID
@@ -117,7 +124,7 @@ const PlayerInput = ({
         {availableUsers.map((user) => (
           <option key={user.userId} value={user.userId}>
             {user.displayName}
-            {user.isStub && ' (Guest)'}
+            
           </option>
         ))}
         <option value="add-new">+ Add New Player</option>
@@ -146,6 +153,11 @@ const PlayerInput = ({
             </div>
 
             <form onSubmit={handleAddPlayerSubmit} onClick={(e) => e.stopPropagation()}>
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -177,7 +189,7 @@ const PlayerInput = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email (Optional)
+                    Email
                   </label>
                   <input
                     type="email"
@@ -191,7 +203,7 @@ const PlayerInput = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number (Optional)
+                    Phone Number
                   </label>
                   <input
                     type="tel"
@@ -205,10 +217,10 @@ const PlayerInput = ({
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
-                    <strong>Smart User Creation:</strong>
+                    <strong>User creation:</strong>
+                    <br />• Requires email or phone
                     <br />• If email/phone exists → adds existing user to group
-                    <br />• If email/phone provided → creates full account with random password  
-                    <br />• If neither provided → creates guest account
+                    <br />• If new → creates account with a secure random password
                   </p>
                 </div>
               </div>
@@ -228,7 +240,11 @@ const PlayerInput = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingPlayer || (!newPlayerForm.firstName.trim() && !newPlayerForm.lastName.trim())}
+                  disabled={
+                    creatingPlayer || 
+                    (!newPlayerForm.firstName.trim() && !newPlayerForm.lastName.trim()) ||
+                    (!newPlayerForm.email.trim() && !newPlayerForm.phone.trim())
+                  }
                   onClick={(e) => e.stopPropagation()}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

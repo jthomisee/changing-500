@@ -112,17 +112,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Check if user is a stub account (no password set)
-    if (user.isStub) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ 
-          error: 'This account needs to be activated. Please contact an admin.'
-        })
-      };
-    }
-
     // Verify password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {

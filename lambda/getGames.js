@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
@@ -15,17 +15,34 @@ exports.handler = async (event) => {
   };
 
   try {
-    const params = {
-      TableName: TABLE_NAME
-    };
+    const qs = event.queryStringParameters || {};
+    let items = [];
 
-    const result = await dynamodb.send(new ScanCommand(params));
+    if ((qs.status || '').toLowerCase() === 'scheduled') {
+      // Query scheduled games via status-date-index
+      const params = {
+        TableName: TABLE_NAME,
+        IndexName: 'status-date-index',
+        KeyConditionExpression: '#status = :scheduled',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':scheduled': 'scheduled' },
+        ScanIndexForward: true
+      };
+      const result = await dynamodb.send(new QueryCommand(params));
+      items = result.Items || [];
+    } else {
+      const params = {
+        TableName: TABLE_NAME
+      };
+      const result = await dynamodb.send(new ScanCommand(params));
+      items = result.Items || [];
+    }
     
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        games: result.Items.sort((a, b) => {
+        games: items.sort((a, b) => {
           const dateCompare = a.date.localeCompare(b.date);
           return dateCompare !== 0 ? dateCompare : a.gameNumber - b.gameNumber;
         })

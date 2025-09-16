@@ -15,6 +15,11 @@ resource "aws_dynamodb_table" "games_table" {
   }
 
   attribute {
+    name = "status"
+    type = "S"
+  }
+
+  attribute {
     name = "createdBy"
     type = "S"
   }
@@ -29,6 +34,13 @@ resource "aws_dynamodb_table" "games_table" {
     name            = "createdBy-index"
     hash_key        = "createdBy"
     projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name               = "status-date-index"
+    hash_key           = "status"
+    range_key          = "date"
+    projection_type    = "ALL"
   }
 
   tags = merge(local.common_tags, {

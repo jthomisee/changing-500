@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, ChevronDown, Users, Calendar, Clock } from 'lucide-react';
+import { User, Settings, LogOut, ChevronDown, Users, Calendar, Clock, Mail } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, selectedGroup, upcomingGames, onRSVPChange }) => {
+const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, onRSVPClick, selectedGroup, upcomingGames, onRSVPChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const { currentUser, handleUserLogout, isAdmin } = useAuth();
@@ -69,6 +69,13 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
     setIsOpen(false);
     if (onGroupMembersClick) {
       onGroupMembersClick();
+    }
+  };
+
+  const handleRSVPClick = () => {
+    setIsOpen(false);
+    if (onRSVPClick) {
+      onRSVPClick();
     }
   };
 
@@ -224,7 +231,15 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
               <Settings className="w-4 h-4" />
               My Profile
             </button>
-            
+
+            <button
+              onClick={handleRSVPClick}
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <Mail className="w-4 h-4" />
+              My RSVPs
+            </button>
+
             {canManageGroup && (
               <button
                 onClick={handleGroupMembersClick}

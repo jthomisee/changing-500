@@ -258,46 +258,6 @@ resource "aws_lambda_function" "delete_user" {
   tags = local.common_tags
 }
 
-# Convert Stub User Lambda Function (Admin only)
-resource "aws_lambda_function" "convert_stub_user" {
-  filename         = "lambda.zip"
-  function_name    = "${var.project_name}-convert-stub-user-${var.environment}"
-  role            = aws_iam_role.lambda_execution_role.arn
-  handler         = "convertStubUser.handler"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  runtime         = "nodejs22.x"
-  timeout         = 30
-
-  environment {
-    variables = {
-      USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
-    }
-  }
-
-  tags = local.common_tags
-}
-
-# Merge Stub User Lambda Function (Admin only)
-resource "aws_lambda_function" "merge_stub_user" {
-  filename         = "lambda.zip"
-  function_name    = "${var.project_name}-merge-stub-user-${var.environment}"
-  role            = aws_iam_role.lambda_execution_role.arn
-  handler         = "mergeStubUser.handler"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  runtime         = "nodejs22.x"
-  timeout         = 30
-
-  environment {
-    variables = {
-      USERS_TABLE_NAME       = aws_dynamodb_table.users_table.name
-      GAMES_TABLE_NAME       = aws_dynamodb_table.games_table.name
-      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
-    }
-  }
-
-  tags = local.common_tags
-}
-
 # Create Group Lambda Function (Admin only)
 resource "aws_lambda_function" "create_group" {
   filename         = "lambda.zip"
@@ -399,12 +359,12 @@ resource "aws_lambda_function" "list_group_users" {
   tags = local.common_tags
 }
 
-# Create Stub User Lambda Function
-resource "aws_lambda_function" "create_stub_user" {
+# Add User To Group Lambda Function
+resource "aws_lambda_function" "add_group_user" {
   filename         = "lambda.zip"
-  function_name    = "${var.project_name}-create-stub-user-${var.environment}"
+  function_name    = "${var.project_name}-add-user-to-group-${var.environment}"
   role            = aws_iam_role.lambda_execution_role.arn
-  handler         = "createStubUser.handler"
+  handler         = "addUserToGroup.handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime         = "nodejs22.x"
   timeout         = 30
@@ -500,22 +460,6 @@ resource "aws_lambda_permission" "api_gateway_delete_user" {
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }
 
-resource "aws_lambda_permission" "api_gateway_convert_stub_user" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.convert_stub_user.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
-}
-
-resource "aws_lambda_permission" "api_gateway_merge_stub_user" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.merge_stub_user.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
-}
-
 resource "aws_lambda_permission" "api_gateway_update_my_profile" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
@@ -580,10 +524,10 @@ resource "aws_lambda_permission" "api_gateway_list_group_users" {
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }
 
-resource "aws_lambda_permission" "api_gateway_create_stub_user" {
+resource "aws_lambda_permission" "api_gateway_add_group_user" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.create_stub_user.function_name
+  function_name = aws_lambda_function.add_group_user.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }
@@ -610,6 +554,22 @@ resource "aws_lambda_permission" "api_gateway_handle_rsvp_link" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.handle_rsvp_link.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_get_rsvp_token" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_rsvp_token.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_update_rsvp_token" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.update_rsvp_token.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }

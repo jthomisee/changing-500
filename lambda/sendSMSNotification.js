@@ -1,7 +1,14 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 const twilio = require('twilio');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+
+// Configure Day.js plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
@@ -29,6 +36,7 @@ async function getTwilioConfig() {
   };
 }
 const USERS_TABLE = process.env.USERS_TABLE_NAME;
+const GAMES_TABLE = process.env.GAMES_TABLE_NAME;
 // No notifications table; fire-and-forget
 
 exports.handler = async (event) => {
@@ -47,7 +55,7 @@ exports.handler = async (event) => {
 };
 
 async function processSMSNotification(notification) {
-  const { userId, type, gameId, groupName, gameDate, gameTime, rsvpToken } = notification;
+  const { userId, type, gameId, groupName, gameDate, gameTime, location, buyin, rsvpToken } = notification;
 
   try {
     // Get user details
@@ -73,12 +81,38 @@ async function processSMSNotification(notification) {
     // Generate message based on type
     let messageText;
     if (type === 'gameInvitations') {
-      const formattedTime = formatGameTime(gameDate, gameTime);
-      const rsvpLink = `https://api.changing500.com/prod/rsvp/${gameId}?token=${encodeURIComponent(rsvpToken)}`;
-      messageText = `You're invited to poker night ${formattedTime} in the ${groupName} group. Reply YES or NO, or use link: ${rsvpLink}`;
+      const userTimezone = user.timezone || 'America/New_York';
+      const formattedTime = formatGameTime(gameDate, gameTime, userTimezone);
+
+      // Use tokenized RSVP link for secure, no-login access
+      const rsvpLink = rsvpToken
+        ? `https://changing500.com/rsvp-token/${rsvpToken}`
+        : `https://changing500.com/rsvp`;
+
+      // Build game details
+      let gameDetails = `poker night ${formattedTime}`;
+      if (location) {
+        gameDetails += ` at ${location}`;
+      }
+      gameDetails += ` in the ${groupName} group`;
+      if (buyin && buyin !== 20) {
+        gameDetails += ` ($${buyin} buy-in)`;
+      }
+
+      // Check if user has multiple pending RSVPs
+      const pendingRSVPCount = await countPendingRSVPs(userId);
+
+      if (pendingRSVPCount > 1) {
+        // Multiple pending RSVPs - force them to use the link
+        messageText = `You're invited to ${gameDetails}. You have multiple pending invitations, please use this link to respond: ${rsvpLink}. Reply STOP to opt-out.`;
+      } else {
+        // Single pending RSVP - allow SMS reply or link
+        messageText = `You're invited to ${gameDetails}. Reply YES or NO, or use link: ${rsvpLink}. Reply STOP to opt-out.`;
+      }
     } else if (type === 'gameResults') {
-      const formattedTime = formatGameTime(gameDate, gameTime);
-      messageText = `Poker game results are in for ${formattedTime} in the ${groupName} group! Check the app to see how you did.`;
+      const userTimezone = user.timezone || 'America/New_York';
+      const formattedTime = formatGameTime(gameDate, gameTime, userTimezone);
+      messageText = `Poker game results are in for ${formattedTime} at ${location} in the ${groupName} group! Check the app to see how you did. Reply STOP to opt-out.`;
     }
 
     // Send SMS via Twilio
@@ -112,25 +146,49 @@ async function sendSMS(phoneNumber, message) {
 
  
 
-function formatGameTime(gameDate, gameTime) {
+async function countPendingRSVPs(userId) {
+  try {
+    // Query scheduled games via GSI and count those with pending RSVPs for this user
+    const params = {
+      TableName: GAMES_TABLE,
+      IndexName: 'status-date-index',
+      KeyConditionExpression: '#status = :scheduled',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':scheduled': 'scheduled' },
+      ScanIndexForward: true
+    };
+
+    const result = await dynamodb.send(new QueryCommand(params));
+    const games = result.Items || [];
+
+    // Count scheduled games where user has pending RSVP
+    const pendingCount = games
+      .filter(game => {
+        const userResult = game.results?.find(r => r.userId === userId);
+        return userResult && (!userResult.rsvpStatus || userResult.rsvpStatus === 'pending');
+      })
+      .length;
+
+    return pendingCount;
+  } catch (error) {
+    console.error('Error counting pending RSVPs:', error);
+    return 0; // Default to 0 on error, which allows SMS replies
+  }
+}
+
+function formatGameTime(gameDate, gameTime, userTimezone = 'America/New_York') {
   if (!gameDate) return '';
-  if (!gameTime) return gameDate; // Just the date as YYYY-MM-DD
+  if (!gameTime) return gameDate; // Just the date
 
   try {
-    const [hourPart, minutePart = '00'] = String(gameTime).split(':');
-    let hour24 = parseInt(hourPart, 10);
-    let minutes = parseInt(minutePart, 10) || 0;
+    // Parse the UTC time stored in the database and convert to user's timezone
+    const utcDateTime = dayjs.utc(`${gameDate} ${gameTime}`);
+    const userDateTime = utcDateTime.tz(userTimezone);
 
-    const ampm = hour24 >= 12 ? 'PM' : 'AM';
-    let hour12 = hour24 % 12;
-    if (hour12 === 0) hour12 = 12;
-
-    const timeStr = minutes > 0
-      ? `${hour12}:${String(minutes).padStart(2, '0')} ${ampm}`
-      : `${hour12} ${ampm}`;
-
-    return `${gameDate}, ${timeStr}`; // YYYY-MM-DD, XX AM/PM
+    // Format in a readable way
+    return userDateTime.format('ddd, MMM D, h:mm A');
   } catch (error) {
-    return `${gameDate}`;
+    console.error('Error formatting game time with Day.js:', error);
+    return `${gameDate}${gameTime ? ` at ${gameTime}` : ''}`;
   }
 }

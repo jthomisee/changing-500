@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Edit, Save, Loader, Key, Shield, Bell, Mail, Phone } from 'lucide-react';
+import { User, Edit, Save, Loader, Key, Shield, Bell, Mail, Phone, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, changePassword } from '../../services/profileService';
 
@@ -14,7 +14,8 @@ const UserProfile = () => {
     firstName: currentUser?.firstName || '',
     lastName: currentUser?.lastName || '',
     email: currentUser?.email || '',
-    phone: currentUser?.phone || ''
+    phone: currentUser?.phone || '',
+    timezone: currentUser?.timezone || 'America/New_York'
   });
 
   // Notification preferences state
@@ -51,7 +52,8 @@ const UserProfile = () => {
       firstName: currentUser?.firstName || '',
       lastName: currentUser?.lastName || '',
       email: currentUser?.email || '',
-      phone: currentUser?.phone || ''
+      phone: currentUser?.phone || '',
+      timezone: currentUser?.timezone || 'America/New_York'
     });
     setIsEditing(true);
     setError('');
@@ -124,7 +126,8 @@ const UserProfile = () => {
       firstName: currentUser?.firstName || '',
       lastName: currentUser?.lastName || '',
       email: currentUser?.email || '',
-      phone: currentUser?.phone || ''
+      phone: currentUser?.phone || '',
+      timezone: currentUser?.timezone || 'America/New_York'
     });
   };
 
@@ -339,6 +342,30 @@ const UserProfile = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Clock className="w-4 h-4 inline mr-1" />
+                Timezone
+              </label>
+              <select
+                value={profileForm.timezone}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, timezone: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="America/Phoenix">Arizona Time (MST)</option>
+                <option value="America/Anchorage">Alaska Time (AKST)</option>
+                <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+                <option value="UTC">UTC (Universal Time)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                This will be used for displaying game times and sending notifications at appropriate times.
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-3 justify-end pt-4">
@@ -405,6 +432,28 @@ const UserProfile = () => {
             <div className="min-w-0">
               <label className="block text-sm font-medium text-gray-500 mb-1">Member Since</label>
               <p className="text-lg text-gray-900 break-words">{formatDate(currentUser.createdAt)}</p>
+            </div>
+
+            <div className="min-w-0 md:col-span-2">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
+                <Clock className="w-4 h-4 inline mr-1" />
+                Timezone
+              </label>
+              <p className="text-lg text-gray-900 break-words">
+                {currentUser.timezone ? (() => {
+                  const timezoneMap = {
+                    'America/New_York': 'Eastern Time (ET)',
+                    'America/Chicago': 'Central Time (CT)',
+                    'America/Denver': 'Mountain Time (MT)',
+                    'America/Los_Angeles': 'Pacific Time (PT)',
+                    'America/Phoenix': 'Arizona Time (MST)',
+                    'America/Anchorage': 'Alaska Time (AKST)',
+                    'Pacific/Honolulu': 'Hawaii Time (HST)',
+                    'UTC': 'UTC (Universal Time)'
+                  };
+                  return timezoneMap[currentUser.timezone] || currentUser.timezone;
+                })() : 'Eastern Time (ET)'}
+              </p>
             </div>
           </div>
         </div>
@@ -635,6 +684,17 @@ const UserProfile = () => {
                       SMS notifications {!currentUser?.phone && '(requires phone number)'}
                     </span>
                   </label>
+                  {(notificationForm.gameInvitations.sms || notificationForm.gameResults.sms) && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mt-3">
+                      <p className="text-xs text-amber-800">
+                        <strong>SMS Terms:</strong> By enabling SMS notifications, you consent to receive text messages from Changing 500.
+                        Message and data rates may apply. Message frequency: ~1-3 messages per week.
+                        Reply STOP to opt-out or update preferences here. See our{' '}
+                        <a href="/terms" className="underline hover:text-amber-900" target="_blank" rel="noopener">Terms</a> and{' '}
+                        <a href="/privacy" className="underline hover:text-amber-900" target="_blank" rel="noopener">Privacy Policy</a>.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

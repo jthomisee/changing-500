@@ -11,14 +11,14 @@ export const searchUsers = async (query = '') => {
   }
 };
 
-export const createStubUser = async (userData) => {
+export const createUserFromSearch = async (userData) => {
   try {
     return await apiCall('/users/search', {
       method: 'POST',
       body: JSON.stringify(userData)
     });
   } catch (error) {
-    console.error('Error creating stub user:', error);
+    console.error('Error creating user:', error);
     throw error;
   }
 };

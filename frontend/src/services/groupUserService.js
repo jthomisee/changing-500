@@ -21,11 +21,10 @@ export const listGroupUsers = async (groupId) => {
   }
 };
 
-// Create a new stub user in a group
-export const createStubUser = async (groupId, userData) => {
+// Create a new user in a group (requires email or phone)
+export const createGroupUser = async (groupId, userData) => {
   try {
-    
-    const data = await apiCall(`/groups/${groupId}/stub-users`, {
+    const data = await apiCall(`/groups/${groupId}/users`, {
       method: 'POST',
       body: JSON.stringify({
         ...userData,
@@ -33,7 +32,7 @@ export const createStubUser = async (groupId, userData) => {
       })
     });
     
-    console.log('createStubUser API response:', data);
+    console.log('createGroupUser API response:', data);
     
     return {
       success: true,
@@ -41,7 +40,7 @@ export const createStubUser = async (groupId, userData) => {
       message: data.message
     };
   } catch (error) {
-    console.error('Failed to create stub user:', error);
+    console.error('Failed to create user:', error);
     return { 
       success: false, 
       error: error.message 

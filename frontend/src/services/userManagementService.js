@@ -70,40 +70,6 @@ export const deleteUser = async (userId) => {
   }
 };
 
-export const convertStubUser = async (userId, userData) => {
-  try {
-    const data = await apiCall(`/users/manage/${userId}/convert-stub`, {
-      method: 'PUT',
-      body: JSON.stringify(userData)
-    });
-    return {
-      success: true,
-      user: data.user,
-      message: data.message
-    };
-  } catch (error) {
-    console.error('Failed to convert stub user:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const mergeStubUser = async (stubUserId, targetUserId) => {
-  try {
-    const data = await apiCall(`/users/manage/${stubUserId}/merge-stub`, {
-      method: 'POST',
-      body: JSON.stringify({ targetUserId })
-    });
-    return {
-      success: true,
-      summary: data.summary,
-      message: data.message
-    };
-  } catch (error) {
-    console.error('Failed to merge stub user:', error);
-    return { success: false, error: error.message };
-  }
-};
-
 // Search for users by email or phone (for adding to groups)
 export const searchUserByEmail = async (searchTerm) => {
   try {

@@ -39,6 +39,7 @@ resource "aws_lambda_function" "send_sms_notification" {
       TWILIO_AUTH_TOKEN          = var.twilio_auth_token
       TWILIO_FROM_NUMBER         = var.twilio_from_number
       USERS_TABLE_NAME           = aws_dynamodb_table.users_table.name
+      GAMES_TABLE_NAME           = aws_dynamodb_table.games_table.name
       RSVP_BASE_URL              = "https://${var.domain_name}/rsvp"
     }
   }
@@ -89,6 +90,46 @@ resource "aws_lambda_function" "handle_rsvp_link" {
   tags = local.common_tags
 }
 
+# Get RSVP Token Lambda Function
+resource "aws_lambda_function" "get_rsvp_token" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-get-rsvp-token-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "getRSVPToken.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GAMES_TABLE_NAME  = aws_dynamodb_table.games_table.name
+      USERS_TABLE_NAME  = aws_dynamodb_table.users_table.name
+      GROUPS_TABLE_NAME = aws_dynamodb_table.groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Update RSVP Token Lambda Function
+resource "aws_lambda_function" "update_rsvp_token" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-update-rsvp-token-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "updateRSVPToken.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GAMES_TABLE_NAME = aws_dynamodb_table.games_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # Send Email Notification Lambda Function (future implementation)
 resource "aws_lambda_function" "send_email_notification" {
   filename         = "lambda.zip"
@@ -103,9 +144,37 @@ resource "aws_lambda_function" "send_email_notification" {
     variables = {
       USERS_TABLE_NAME = aws_dynamodb_table.users_table.name
       RSVP_BASE_URL    = "https://${var.domain_name}/rsvp"
+      FROM_EMAIL       = "noreply@${var.domain_name}"
     }
   }
 
   tags = local.common_tags
 }
+
+# SES Email Configuration
+resource "aws_ses_domain_identity" "main" {
+  domain = var.domain_name
+}
+
+resource "aws_ses_domain_dkim" "main" {
+  domain = aws_ses_domain_identity.main.domain
+}
+
+resource "aws_ses_domain_mail_from" "main" {
+  domain           = aws_ses_domain_identity.main.domain
+  mail_from_domain = "mail.${aws_ses_domain_identity.main.domain}"
+}
+
+# SES Configuration Set for email tracking
+resource "aws_ses_configuration_set" "main" {
+  name = "${var.project_name}-${var.environment}"
+
+  delivery_options {
+    tls_policy = "Require"
+  }
+
+  reputation_metrics_enabled = true
+}
+
+# SQS resources are defined in sqs.tf
 

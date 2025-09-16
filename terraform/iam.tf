@@ -125,11 +125,40 @@ resource "aws_iam_policy" "lambda_sqs_policy" {
   tags = local.common_tags
 }
 
-# Attach Connect policy to Lambda role
- 
+# IAM policy for Lambda to access SES
+resource "aws_iam_policy" "lambda_ses_policy" {
+  name        = "${var.project_name}-lambda-ses-policy-${var.environment}"
+  description = "Policy for Lambda to send emails via SES"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail",
+          "ses:SendBulkTemplatedEmail",
+          "ses:SendTemplatedEmail"
+        ]
+        Resource = [
+          "arn:aws:ses:*:*:identity/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
 
 # Attach SQS policy to Lambda role
 resource "aws_iam_role_policy_attachment" "lambda_sqs_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_sqs_policy.arn
+  role       = aws_iam_role.lambda_execution_role.name
+}
+
+# Attach SES policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_ses_policy_attachment" {
+  policy_arn = aws_iam_policy.lambda_ses_policy.arn
   role       = aws_iam_role.lambda_execution_role.name
 }

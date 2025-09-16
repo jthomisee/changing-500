@@ -12,6 +12,7 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
     lastName: '',
     phone: ''
   });
+  const [error, setError] = useState('');
 
   const resetForm = () => {
     setFormData({
@@ -29,10 +30,15 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
     onClose();
     resetForm();
     setAuthMode('login');
+    setError('');
   };
 
-  const handleSubmit = () => {
-    onSubmit(authMode, formData);
+  const handleSubmit = async () => {
+    setError('');
+    const result = await onSubmit(authMode, formData);
+    if (!result?.success) {
+      setError(result?.error || 'Something went wrong. Please try again.');
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -73,6 +79,12 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
 
         <div className="space-y-4">
           {authMode === 'register' && (

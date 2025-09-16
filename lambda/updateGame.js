@@ -121,11 +121,12 @@ exports.handler = async (event) => {
     const updateParams = {
       TableName: TABLE_NAME,
       Key: { id: gameId },
-      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, updatedAt = :updatedAt, updatedBy = :updatedBy',
+      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, #location = :location, updatedAt = :updatedAt, updatedBy = :updatedBy',
       ExpressionAttributeNames: {
         '#date': 'date', // 'date' is a reserved word in DynamoDB
         '#time': 'time', // 'time' is a reserved word in DynamoDB
-        '#status': 'status' // 'status' is a reserved word in DynamoDB
+        '#status': 'status', // 'status' is a reserved word in DynamoDB
+        '#location': 'location'
       },
       ExpressionAttributeValues: {
         ':date': gameData.date,
@@ -133,6 +134,7 @@ exports.handler = async (event) => {
         ':results': resultsWithTies,
         ':groupId': groupId,
         ':status': gameData.status || 'completed',
+        ':location': gameData.location || null,
         ':updatedAt': new Date().toISOString(),
         ':updatedBy': userId
       },

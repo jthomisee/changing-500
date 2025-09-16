@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { listGroupUsers, createStubUser } from '../services/groupUserService';
+import { listGroupUsers, createGroupUser } from '../services/groupUserService';
 
 export const useGroupUsers = (groupId) => {
   const [groupUsers, setGroupUsers] = useState([]);
@@ -33,35 +33,31 @@ export const useGroupUsers = (groupId) => {
     }
   }, [groupId]);
 
-  // Create new stub user
-  const addStubUser = async (userData) => {
+  // Create new user (requires email or phone); backend auto-generates password
+  const addGroupUser = async (userData) => {
     if (!groupId) {
       return { success: false, error: 'No group selected' };
     }
 
     try {
-      const result = await createStubUser(groupId, userData);
+      const result = await createGroupUser(groupId, userData);
       if (result.success) {
         // Add the new user to the local list and sort it properly
         setGroupUsers(prevUsers => {
           const updatedUsers = [...prevUsers, result.user];
-          // Sort: non-stub users first, then alphabetically
+          // Sort alphabetically
           return updatedUsers.sort((a, b) => {
-            // Non-stub users first
-            if (a.isStub && !b.isStub) return 1;
-            if (!a.isStub && b.isStub) return -1;
-            // Then by display name
             return a.displayName.localeCompare(b.displayName);
           });
         });
-        console.log('Successfully created and added stub user:', result.user);
+        console.log('Successfully created and added user:', result.user);
         return result;
       } else {
-        console.error('Failed to create stub user:', result.error);
+        console.error('Failed to create user:', result.error);
         return result;
       }
     } catch (error) {
-      console.error('Error creating stub user:', error);
+      console.error('Error creating user:', error);
       return { 
         success: false, 
         error: error.message 
@@ -79,6 +75,6 @@ export const useGroupUsers = (groupId) => {
     loading,
     error,
     loadGroupUsers,
-    addStubUser
+    addGroupUser
   };
 };

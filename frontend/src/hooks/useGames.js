@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
-import { loadGames, saveGameToDB, updateGameInDB, deleteGameFromDB } from '../services/gameService';
+import { loadGames, loadScheduledGames, saveGameToDB, updateGameInDB, deleteGameFromDB } from '../services/gameService';
 import { validateGameData } from '../utils/gameUtils';
 
 export const useGames = () => {
   const [games, setGames] = useState([]);
+  const [scheduledGames, setScheduledGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -12,8 +13,12 @@ export const useGames = () => {
     setLoading(true);
     setError('');
     try {
-      const loadedGames = await loadGames();
+      const [loadedGames, loadedScheduled] = await Promise.all([
+        loadGames(),
+        loadScheduledGames()
+      ]);
       setGames(loadedGames);
+      setScheduledGames(loadedScheduled);
     } catch (err) {
       console.error('Failed to load games:', err);
       setError('Failed to load games. Please try again.');
@@ -40,12 +45,18 @@ export const useGames = () => {
 
       const savedGame = await saveGameToDB(gameToSave);
       const newGame = { ...gameToSave, id: savedGame.id || games.length + 1 };
-      setGames([...games, newGame]);
+      setGames(prev => [...prev, newGame]);
+      if ((newGame.status || '').toLowerCase() === 'scheduled') {
+        setScheduledGames(prev => [...prev, newGame]);
+      }
       return newGame;
     } catch (dbError) {
       console.warn('Database save failed, adding locally:', dbError);
       const localGame = { ...gameData, id: games.length + 1 };
-      setGames([...games, localGame]);
+      setGames(prev => [...prev, localGame]);
+      if ((localGame.status || '').toLowerCase() === 'scheduled') {
+        setScheduledGames(prev => [...prev, localGame]);
+      }
       setError('Game saved locally. Database sync failed.');
       return localGame;
     } finally {
@@ -64,11 +75,17 @@ export const useGames = () => {
     setError('');
 
     try {
-      await updateGameInDB(gameId, gameData);
-      
-      setGames(games.map(game => 
-        game.id === gameId ? { ...gameData, id: gameId } : game
-      ));
+      const response = await updateGameInDB(gameId, gameData);
+      const updatedGame = (response && response.game) ? response.game : { ...gameData, id: gameId };
+
+      setGames(prev => prev.map(game => game.id === gameId ? updatedGame : game));
+      setScheduledGames(prev => {
+        const without = prev.filter(g => g.id !== gameId);
+        if ((updatedGame.status || '').toLowerCase() === 'scheduled') {
+          return [...without, updatedGame];
+        }
+        return without;
+      });
     } catch (dbError) {
       console.warn('Database update failed:', dbError);
       setError('Failed to update game in database.');
@@ -88,7 +105,8 @@ export const useGames = () => {
 
     try {
       await deleteGameFromDB(gameId);
-      setGames(games.filter(game => game.id !== gameId));
+      setGames(prev => prev.filter(game => game.id !== gameId));
+      setScheduledGames(prev => prev.filter(game => game.id !== gameId));
     } catch (err) {
       console.error('Failed to delete game:', err);
       setError('Failed to delete game. Please try again.');
@@ -99,6 +117,7 @@ export const useGames = () => {
 
   return {
     games,
+    scheduledGames,
     loading,
     error,
     setError,
