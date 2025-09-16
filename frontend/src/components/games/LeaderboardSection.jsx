@@ -1,9 +1,9 @@
 import React from 'react';
 import { TrendingUp, Trophy, ChevronDown } from 'lucide-react';
-import SortableHeader from '../common/SortableHeader';
-import { TableLoadingState, CardLoadingState } from '../common/LoadingSpinner';
-import { NoStandingsEmptyState } from '../common/EmptyState';
-import { useGameContext } from '../../context/GameContext';
+import SortableHeader from '../common/SortableHeader.jsx';
+import { TableLoadingState, CardLoadingState } from '../common/LoadingSpinner.jsx';
+import { NoStandingsEmptyState } from '../common/EmptyState.jsx';
+import { useGameContext } from '../../context/GameContext.jsx';
 
 const LeaderboardSection = ({
   isMobile,

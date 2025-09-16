@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export const useAuthHandlers = () => {
   const { handleUserRegister, handleUserLogin } = useAuth();

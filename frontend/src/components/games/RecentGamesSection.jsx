@@ -1,9 +1,9 @@
 import React from 'react';
 import { Calendar, DollarSign, Users, Edit, Trash2, Trophy, MapPin } from 'lucide-react';
-import LoadingButton from '../common/LoadingButton';
+import LoadingButton from '../common/LoadingButton.jsx';
 import { calculatePoints } from '../../utils/gameUtils';
-import { NoGamesEmptyState, SelectGroupEmptyState } from '../common/EmptyState';
-import { useGameContext } from '../../context/GameContext';
+import { NoGamesEmptyState, SelectGroupEmptyState } from '../common/EmptyState.jsx';
+import { useGameContext } from '../../context/GameContext.jsx';
 
 const RecentGamesSection = ({ openAddGame }) => {
   const {

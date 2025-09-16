@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Users, CheckCircle, XCircle, Clock, MapPin, DollarSign, ArrowLeft } from 'lucide-react';
 import { apiCall } from '../services/api';
-import LoadingButton from '../components/common/LoadingButton';
+import LoadingButton from '../components/common/LoadingButton.jsx';
 import { formatGameDateTime } from '../utils/dateUtils';
 
 const TokenRSVPPage = () => {

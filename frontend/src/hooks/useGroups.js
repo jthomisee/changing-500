@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listGroups, createGroup } from '../services/groupService.js';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export const useGroups = () => {
   const { currentUser, isAuthenticated } = useAuth();

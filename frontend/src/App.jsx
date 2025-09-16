@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import { Plus, DollarSign, Calendar, Users, Edit, Trash2, X, Save, Loader, MapPin } from 'lucide-react';
 
 // Context and Hooks
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { useGames } from './hooks/useGames';
 import { useStandings } from './hooks/useStandings';
 import { useGameForm } from './hooks/useGameForm';
@@ -13,27 +13,27 @@ import { useAuthHandlers } from './hooks/useAuthHandlers';
 import { useMobileDetection } from './hooks/useResponsive';
 
 // Components
-import LoginModal from './components/auth/LoginModal';
-import LoadingButton from './components/common/LoadingButton';
-import PlayerInput from './components/games/PlayerInput';
-import UserManagement from './components/admin/UserManagement';
-import UserProfile from './components/user/UserProfile';
-import HeaderSection from './components/layout/HeaderSection';
-import LeaderboardSection from './components/games/LeaderboardSection';
-import UpcomingGamesSection from './components/games/UpcomingGamesSection';
-import RecentGamesSection from './components/games/RecentGamesSection';
-import GameFormModal from './components/games/GameFormModal';
-import { GameProvider } from './context/GameContext';
+import LoginModal from './components/auth/LoginModal.jsx';
+import LoadingButton from './components/common/LoadingButton.jsx';
+import PlayerInput from './components/games/PlayerInput.jsx';
+import UserManagement from './components/admin/UserManagement.jsx';
+import UserProfile from './components/user/UserProfile.jsx';
+import HeaderSection from './components/layout/HeaderSection.jsx';
+import LeaderboardSection from './components/games/LeaderboardSection.jsx';
+import UpcomingGamesSection from './components/games/UpcomingGamesSection.jsx';
+import RecentGamesSection from './components/games/RecentGamesSection.jsx';
+import GameFormModal from './components/games/GameFormModal.jsx';
+import { GameProvider } from './context/GameContext.jsx';
 
 // Pages
-import RSVPPage from './pages/RSVPPage';
-import TokenRSVPPage from './pages/TokenRSVPPage';
-import TermsPage from './pages/TermsPage';
-import PrivacyPage from './pages/PrivacyPage';
+import RSVPPage from './pages/RSVPPage.jsx';
+import TokenRSVPPage from './pages/TokenRSVPPage.jsx';
+import TermsPage from './pages/TermsPage.jsx';
+import PrivacyPage from './pages/PrivacyPage.jsx';
 
 // Services
 import { triggerGameInvitations, triggerGameResults } from './services/notificationService';
-import GroupManagement from './components/groups/GroupManagement';
+import GroupManagement from './components/groups/GroupManagement.jsx';
 
 // Utils
 import { isGameScheduled } from './utils/gameUtils';
@@ -47,7 +47,6 @@ import {
 import { DEFAULT_VALUES, UI_TEXT } from './constants/ui';
 
 // Styles
-import './App.css';
 
 // Main App Component (wrapped with AuthProvider and Router)
 const Changing500App = () => {

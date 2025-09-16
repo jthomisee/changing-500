@@ -1,8 +1,8 @@
 import React from 'react';
 import { Trophy, X } from 'lucide-react';
-import AuthButtons from '../auth/AuthButtons';
-import UserDropdown from '../user/UserDropdown';
-import GroupSelector from '../groups/GroupSelector';
+import AuthButtons from '../auth/AuthButtons.jsx';
+import UserDropdown from '../user/UserDropdown.jsx';
+import GroupSelector from '../groups/GroupSelector.jsx';
 
 const HeaderSection = ({
   isMobile,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Save, X } from 'lucide-react';
-import LoadingButton from '../common/LoadingButton';
-import PlayerInput from './PlayerInput';
+import LoadingButton from '../common/LoadingButton.jsx';
+import PlayerInput from './PlayerInput.jsx';
 
 const GameFormModal = ({
   showAddGame,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Crown, UserMinus, UserPlus, Search, Loader, X, Save, Mail } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { listGroupMembers, updateMemberRole, removeGroupMember, addGroupMember } from '../../services/groupService';
 import { searchUserByEmail, createUser } from '../../services/userManagementService';
 

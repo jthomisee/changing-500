@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, DollarSign, Users, Edit, Trash2, MapPin } from 'lucide-react';
-import LoadingButton from '../common/LoadingButton';
-import { useGameContext } from '../../context/GameContext';
+import LoadingButton from '../common/LoadingButton.jsx';
+import { useGameContext } from '../../context/GameContext.jsx';
 
 const UpcomingGamesSection = () => {
   const {

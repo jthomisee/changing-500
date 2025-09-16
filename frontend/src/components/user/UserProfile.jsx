@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Edit, Save, Loader, Key, Shield, Bell, Mail, Phone, Clock } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { updateMyProfile, changePassword } from '../../services/profileService';
 
 const UserProfile = () => {

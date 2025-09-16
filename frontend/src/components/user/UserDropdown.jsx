@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Settings, LogOut, ChevronDown, Users, Calendar, Clock, Mail } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, onRSVPClick, selectedGroup, upcomingGames, onRSVPChange }) => {
   const [isOpen, setIsOpen] = useState(false);

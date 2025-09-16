@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import LoadingButton from '../common/LoadingButton';
+import LoadingButton from '../common/LoadingButton.jsx';
 
 const LoginModal = ({ show, onClose, loading, onSubmit }) => {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Users, ArrowLeft, CheckCircle, XCircle, Clock, MapPin, DollarSign } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useGames } from '../hooks/useGames';
-import LoadingButton from '../components/common/LoadingButton';
+import LoadingButton from '../components/common/LoadingButton.jsx';
 import { formatGameDateTime } from '../utils/dateUtils';
 
 const RSVPPage = () => {
