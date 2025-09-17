@@ -113,10 +113,28 @@ resource "aws_dynamodb_table" "groups_table" {
     type = "S"
   }
 
+  attribute {
+    name = "isPublic"
+    type = "S"  # Using string for boolean to support DynamoDB GSI
+  }
+
+  attribute {
+    name = "createdAt"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "name-index"
     hash_key        = "name"
     projection_type = "ALL"
+  }
+
+  # GSI for querying public groups efficiently
+  global_secondary_index {
+    name               = "isPublic-createdAt-index"
+    hash_key           = "isPublic"
+    range_key          = "createdAt"
+    projection_type    = "ALL"
   }
 
   tags = merge(local.common_tags, {

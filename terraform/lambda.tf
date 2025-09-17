@@ -339,6 +339,26 @@ resource "aws_lambda_function" "join_group" {
   tags = local.common_tags
 }
 
+# List Public Groups Lambda Function
+resource "aws_lambda_function" "list_public_groups" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-list-public-groups-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "listPublicGroups.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # Manage Group Members Lambda Function
 resource "aws_lambda_function" "manage_group_members" {
   filename         = "lambda.zip"
@@ -393,6 +413,26 @@ resource "aws_lambda_function" "add_group_user" {
   environment {
     variables = {
       USERS_TABLE_NAME       = aws_dynamodb_table.users_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Update Group Lambda Function
+resource "aws_lambda_function" "update_group" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-update-group-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "updateGroup.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
       USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
     }
   }
@@ -591,6 +631,22 @@ resource "aws_lambda_permission" "api_gateway_update_rsvp_token" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.update_rsvp_token.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_list_public_groups" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.list_public_groups.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_update_group" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.update_group.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }

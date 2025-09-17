@@ -9,7 +9,7 @@ export const listAllUsers = async (searchTerm = '', limit = 50) => {
     }
 
     const data = await apiCall(`/users/manage${queryParams}`, {
-      method: 'GET'
+      method: 'GET',
     });
 
     return { success: true, users: data.users, count: data.count };
@@ -23,7 +23,7 @@ export const updateUserById = async (userId, userData) => {
   try {
     const data = await apiCall(`/users/manage/${userId}`, {
       method: 'PUT',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(userData),
     });
 
     return { success: true, user: data.user };
@@ -36,14 +36,14 @@ export const updateUserById = async (userId, userData) => {
 export const resetUserPassword = async (userId) => {
   try {
     const data = await apiCall(`/users/manage/${userId}/reset-password`, {
-      method: 'PUT'
+      method: 'PUT',
     });
 
     return {
       success: true,
       user: data.user,
       tempPassword: data.tempPassword,
-      instructions: data.instructions
+      instructions: data.instructions,
     };
   } catch (error) {
     console.error('Failed to reset user password:', error);
@@ -54,7 +54,7 @@ export const resetUserPassword = async (userId) => {
 export const deleteUser = async (userId) => {
   try {
     const data = await apiCall(`/users/manage/${userId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     });
 
     return {
@@ -62,7 +62,7 @@ export const deleteUser = async (userId) => {
       deletedUser: data.deletedUser,
       deletedMemberships: data.deletedMemberships,
       warnings: data.warnings || [],
-      message: data.message
+      message: data.message,
     };
   } catch (error) {
     console.error('Failed to delete user:', error);
@@ -73,15 +73,18 @@ export const deleteUser = async (userId) => {
 // Search for users by email or phone (for adding to groups)
 export const searchUserByEmail = async (searchTerm) => {
   try {
-    const data = await apiCall(`/users/manage?search=${encodeURIComponent(searchTerm)}&limit=1`, {
-      method: 'GET'
-    });
+    const data = await apiCall(
+      `/users/manage?search=${encodeURIComponent(searchTerm)}&limit=1`,
+      {
+        method: 'GET',
+      }
+    );
 
     return {
       success: true,
       users: data.users,
       found: data.users && data.users.length > 0,
-      user: data.users && data.users.length > 0 ? data.users[0] : null
+      user: data.users && data.users.length > 0 ? data.users[0] : null,
     };
   } catch (error) {
     console.error('Failed to search for user:', error);
@@ -92,18 +95,25 @@ export const searchUserByEmail = async (searchTerm) => {
 // Admin function to create a new user (similar to register but for admins)
 export const createUser = async (userData) => {
   try {
+    // Remove null/empty fields so backend doesn't receive NULL attributes
+    const sanitized = Object.fromEntries(
+      Object.entries(userData).filter(
+        ([_, v]) => v !== null && v !== undefined && v !== ''
+      )
+    );
+
     const data = await apiCall('/users/register', {
       method: 'POST',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(sanitized),
     });
 
     return { success: true, user: data.user };
   } catch (error) {
     console.error('Failed to create user:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
-      statusCode: error.statusCode || error.status // Include status code if available
+      statusCode: error.statusCode || error.status, // Include status code if available
     };
   }
 };

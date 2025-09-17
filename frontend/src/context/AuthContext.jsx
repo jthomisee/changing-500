@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
+import {
   registerUser as registerUserAPI,
   loginUser as loginUserAPI,
   setUserSession,
   getUserSession,
-  clearUserSession
+  clearUserSession,
 } from '../services/authService';
 
 const AuthContext = createContext();
@@ -18,10 +18,10 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // User state  
+  // User state
   const [currentUser, setCurrentUser] = useState(null);
   const [userToken, setUserToken] = useState(null);
-  
+
   // Loading states
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(userSession.user);
     }
   }, []);
-
 
   // Authentication functions
   const handleUserRegister = async (userData) => {
@@ -47,7 +46,14 @@ export const AuthProvider = ({ children }) => {
 
     setLoading(true);
     try {
-      const result = await registerUserAPI({ email, password, firstName, lastName, phone, isAdmin });
+      const result = await registerUserAPI({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone,
+        isAdmin,
+      });
       return result;
     } finally {
       setLoading(false);
@@ -84,23 +90,26 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
     setUserToken(null);
     clearUserSession();
+    try {
+      localStorage.removeItem('selectedGroupId');
+    } catch {}
   };
 
   const value = {
     // User state
     currentUser,
     userToken,
-    
+
     // Derived state
     isAdmin: currentUser?.isAdmin || false,
     isAuthenticated: !!currentUser,
     loading,
-    
+
     // Authentication functions
     handleUserRegister,
     handleUserLogin,
     handleUserLogout,
-    refreshCurrentUser
+    refreshCurrentUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

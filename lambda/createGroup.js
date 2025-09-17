@@ -48,7 +48,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const { name, description } = JSON.parse(event.body || '{}');
+    const { name, description, isPublic } = JSON.parse(event.body || '{}');
     
     // Validate required fields
     if (!name || !name.trim()) {
@@ -91,6 +91,7 @@ exports.handler = async (event) => {
       groupId,
       name: name.trim(),
       description: description?.trim() || '',
+      isPublic: Boolean(isPublic) ? 'true' : 'false', // Store as string for DynamoDB GSI
       createdAt: now,
       updatedAt: now,
       createdBy: userId,
@@ -125,7 +126,10 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         message: 'Group created successfully',
-        group: newGroup,
+        group: {
+          ...newGroup,
+          isPublic: newGroup.isPublic === 'true' // Convert back to boolean for frontend
+        },
         membership: ownerMembership
       })
     };

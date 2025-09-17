@@ -1,17 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Crown, UserMinus, UserPlus, Search, Loader, X, Save, Mail } from 'lucide-react';
+import {
+  Users,
+  Crown,
+  UserMinus,
+  UserPlus,
+  Search,
+  Loader,
+  X,
+  Save,
+  Mail,
+  Eye,
+  EyeOff,
+  Settings,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { listGroupMembers, updateMemberRole, removeGroupMember, addGroupMember } from '../../services/groupService';
-import { searchUserByEmail, createUser } from '../../services/userManagementService';
+import {
+  listGroupMembers,
+  updateMemberRole,
+  removeGroupMember,
+  addGroupMember,
+  updateGroup,
+} from '../../services/groupService';
+import {
+  searchUserByEmail,
+  createUser,
+} from '../../services/userManagementService';
 
 const GroupManagement = ({ selectedGroup, onClose }) => {
   // Authentication
   const { isAdmin, currentUser } = useAuth();
-  
+
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  // Group settings state
+  const [updatingSettings, setUpdatingSettings] = useState(false);
 
   // Add user to group state
   const [showAddUser, setShowAddUser] = useState(false);
@@ -28,13 +53,13 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
     lastName: '',
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
 
   // Load group members
   const loadMembers = useCallback(async () => {
     if (!selectedGroup) return;
-    
+
     setLoading(true);
     setError('');
     try {
@@ -54,15 +79,24 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   // Update member role
   const handleRoleUpdate = async (userId, currentRole) => {
     const newRole = currentRole === 'owner' ? 'member' : 'owner';
-    const memberName = members.find(m => m.userId === userId)?.firstName || 'User';
-    
-    if (!window.confirm(`${newRole === 'owner' ? 'Promote' : 'Demote'} ${memberName} ${newRole === 'owner' ? 'to owner' : 'to member'}?`)) {
+    const memberName =
+      members.find((m) => m.userId === userId)?.firstName || 'User';
+
+    if (
+      !window.confirm(
+        `${newRole === 'owner' ? 'Promote' : 'Demote'} ${memberName} ${newRole === 'owner' ? 'to owner' : 'to member'}?`
+      )
+    ) {
       return;
     }
 
     setUpdating(true);
     try {
-      const result = await updateMemberRole(selectedGroup.groupId, userId, newRole);
+      const result = await updateMemberRole(
+        selectedGroup.groupId,
+        userId,
+        newRole
+      );
       if (result.success) {
         await loadMembers(); // Refresh the list
       } else {
@@ -77,8 +111,9 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
 
   // Remove member
   const handleRemoveMember = async (userId) => {
-    const memberName = members.find(m => m.userId === userId)?.firstName || 'User';
-    
+    const memberName =
+      members.find((m) => m.userId === userId)?.firstName || 'User';
+
     if (!window.confirm(`Remove ${memberName} from this group?`)) {
       return;
     }
@@ -114,7 +149,9 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       if (result.success) {
         if (result.found) {
           // Check if user is already in the group
-          const isAlreadyMember = members.some(member => member.email === result.user.email);
+          const isAlreadyMember = members.some(
+            (member) => member.email === result.user.email
+          );
           if (isAlreadyMember) {
             alert('This user is already a member of this group');
             setSearchResult(null);
@@ -129,7 +166,7 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
             lastName: '',
             phone: '',
             password: '',
-            confirmPassword: ''
+            confirmPassword: '',
           });
           setShowCreateUser(true);
           setSearchResult(null);
@@ -148,11 +185,17 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   const handleAddExistingUser = async (user, role = 'member') => {
     setAddingUser(true);
     try {
-      const result = await addGroupMember(selectedGroup.groupId, user.userId, role);
+      const result = await addGroupMember(
+        selectedGroup.groupId,
+        user.userId,
+        role
+      );
       if (result.success) {
         await loadMembers(); // Refresh the list
         handleCancelAddUser(); // Close the add user form
-        alert(`${user.firstName} ${user.lastName} has been added to the group!`);
+        alert(
+          `${user.firstName} ${user.lastName} has been added to the group!`
+        );
       } else {
         alert(`Failed to add user: ${result.error}`);
       }
@@ -166,7 +209,11 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   // Create new user and add to group
   const handleCreateAndAddUser = async () => {
     // Validate form
-    if (!newUserForm.firstName || !newUserForm.lastName || !newUserForm.password) {
+    if (
+      !newUserForm.firstName ||
+      !newUserForm.lastName ||
+      !newUserForm.password
+    ) {
       alert('Please fill in all required fields');
       return;
     }
@@ -194,16 +241,22 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
         firstName: newUserForm.firstName,
         lastName: newUserForm.lastName,
         phone: newUserForm.phone || undefined,
-        password: newUserForm.password
+        password: newUserForm.password,
       });
 
       if (createResult.success) {
         // Add user to group
-        const addResult = await addGroupMember(selectedGroup.groupId, createResult.user.userId, 'member');
+        const addResult = await addGroupMember(
+          selectedGroup.groupId,
+          createResult.user.userId,
+          'member'
+        );
         if (addResult.success) {
           await loadMembers(); // Refresh the list
           handleCancelAddUser(); // Close the add user form
-          alert(`${newUserForm.firstName} ${newUserForm.lastName} has been created and added to the group!`);
+          alert(
+            `${newUserForm.firstName} ${newUserForm.lastName} has been created and added to the group!`
+          );
         } else {
           alert(`User created but failed to add to group: ${addResult.error}`);
         }
@@ -229,17 +282,44 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       lastName: '',
       phone: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
     });
+  };
+
+  // Toggle group public/private setting
+  const handleTogglePublic = async () => {
+    if (!selectedGroup) return;
+
+    setUpdatingSettings(true);
+    try {
+      const newIsPublic = !selectedGroup.isPublic;
+      const result = await updateGroup(selectedGroup.groupId, {
+        isPublic: newIsPublic,
+      });
+
+      if (result.success) {
+        // Update the selectedGroup data locally
+        selectedGroup.isPublic = newIsPublic;
+        alert(`Group is now ${newIsPublic ? 'public' : 'private'}`);
+      } else {
+        alert(`Failed to update group visibility: ${result.error}`);
+      }
+    } catch (error) {
+      alert(`Failed to update group visibility: ${error.message}`);
+    } finally {
+      setUpdatingSettings(false);
+    }
   };
 
   // Check if current user can add users to this group
   const canAddUsers = () => {
     if (isAdmin) return true; // Admins can always add users
     if (!currentUser || !selectedGroup) return false;
-    
+
     // Check if current user is owner of this group
-    const currentUserMembership = members.find(member => member.userId === currentUser.userId);
+    const currentUserMembership = members.find(
+      (member) => member.userId === currentUser.userId
+    );
     return currentUserMembership?.role === 'owner';
   };
 
@@ -294,6 +374,55 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
         </div>
       )}
 
+      {/* Group Settings */}
+      {(selectedGroup?.userRole === 'owner' || isAdmin) && (
+        <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Settings className="w-5 h-5 text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              Group Settings
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            {/* Public/Private Toggle */}
+            <div className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-gray-200">
+              <div className="flex items-center gap-3">
+                {selectedGroup?.isPublic ? (
+                  <Eye className="w-5 h-5 text-green-600" />
+                ) : (
+                  <EyeOff className="w-5 h-5 text-gray-600" />
+                )}
+                <div>
+                  <p className="font-medium text-gray-900">
+                    {selectedGroup?.isPublic ? 'Public Group' : 'Private Group'}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {selectedGroup?.isPublic
+                      ? 'Anyone can find and join this group'
+                      : 'Only invited members can join this group'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleTogglePublic}
+                disabled={updatingSettings}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                  selectedGroup?.isPublic ? 'bg-green-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    selectedGroup?.isPublic ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Members List */}
       {loading ? (
         <div className="text-center py-8">
@@ -308,11 +437,18 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
             </div>
           ) : (
             members.map((member) => (
-              <div key={member.userId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div
+                key={member.userId}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    {member.role === 'owner' && <Crown className="w-5 h-5 text-yellow-600" />}
-                    {member.role === 'member' && <Users className="w-5 h-5 text-blue-600" />}
+                    {member.role === 'owner' && (
+                      <Crown className="w-5 h-5 text-yellow-600" />
+                    )}
+                    {member.role === 'member' && (
+                      <Users className="w-5 h-5 text-blue-600" />
+                    )}
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">
@@ -324,7 +460,7 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleRoleUpdate(member.userId, member.role)}
@@ -335,9 +471,11 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                         : 'border-blue-300 text-blue-700 hover:bg-blue-50'
                     } disabled:opacity-50`}
                   >
-                    {member.role === 'owner' ? 'Demote to Member' : 'Promote to Owner'}
+                    {member.role === 'owner'
+                      ? 'Demote to Member'
+                      : 'Promote to Owner'}
                   </button>
-                  
+
                   <button
                     onClick={() => handleRemoveMember(member.userId)}
                     disabled={updating}
@@ -356,9 +494,11 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       {/* Add User Modal */}
       {showAddUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-blue-900">Add User to Group</h3>
+              <h3 className="text-lg font-semibold text-blue-900">
+                Add User to Group
+              </h3>
               <button
                 onClick={handleCancelAddUser}
                 disabled={addingUser}
@@ -385,7 +525,9 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                         placeholder="Enter email or phone number..."
                         disabled={searching}
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearchUser()}
+                        onKeyPress={(e) =>
+                          e.key === 'Enter' && handleSearchUser()
+                        }
                       />
                     </div>
                     <button
@@ -393,38 +535,50 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                       disabled={searching || !searchEmail.trim()}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      {searching ? <Loader className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      {searching ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4" />
+                      )}
                       Search
                     </button>
                   </div>
 
                   {/* Search Result - Found User */}
                   {searchResult && (
-                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center justify-between">
+                    <div className="mt-6 p-5 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="font-medium text-green-900">
                             {searchResult.firstName} {searchResult.lastName}
                           </p>
-                          <p className="text-sm text-green-700">{searchResult.email}</p>
+                          <p className="text-sm text-green-700">
+                            {searchResult.email}
+                          </p>
                           {searchResult.phone && (
-                            <p className="text-sm text-green-700">{searchResult.phone}</p>
+                            <p className="text-sm text-green-700">
+                              {searchResult.phone}
+                            </p>
                           )}
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleAddExistingUser(searchResult, 'member')}
+                            onClick={() =>
+                              handleAddExistingUser(searchResult, 'member')
+                            }
                             disabled={addingUser}
-                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                            className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
                           >
-                            Add as Member
+                            Member
                           </button>
                           <button
-                            onClick={() => handleAddExistingUser(searchResult, 'owner')}
+                            onClick={() =>
+                              handleAddExistingUser(searchResult, 'owner')
+                            }
                             disabled={addingUser}
-                            className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 disabled:opacity-50"
+                            className="px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 disabled:opacity-50"
                           >
-                            Add as Owner
+                            Owner
                           </button>
                         </div>
                       </div>
@@ -438,11 +592,16 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                 <div>
                   <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-yellow-800 text-sm">
-                      No user found with email <strong>{newUserForm.email}</strong>. 
+                      No user found with email{' '}
+                      <strong>{newUserForm.email}</strong>.
                       {isAdmin ? (
                         <>Create a new user account:</>
                       ) : (
-                        <>Only administrators can create new user accounts. Please ask an admin to create this user first, or search for an existing user.</>
+                        <>
+                          Only administrators can create new user accounts.
+                          Please ask an admin to create this user first, or
+                          search for an existing user.
+                        </>
                       )}
                     </p>
                   </div>
@@ -461,88 +620,117 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                   {isAdmin && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            First Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={newUserForm.firstName}
+                            onChange={(e) =>
+                              setNewUserForm({
+                                ...newUserForm,
+                                firstName: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={addingUser}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Last Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={newUserForm.lastName}
+                            onChange={(e) =>
+                              setNewUserForm({
+                                ...newUserForm,
+                                lastName: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={addingUser}
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          First Name *
+                          Phone (optional)
                         </label>
                         <input
-                          type="text"
-                          value={newUserForm.firstName}
-                          onChange={(e) => setNewUserForm({...newUserForm, firstName: e.target.value})}
+                          type="tel"
+                          value={newUserForm.phone}
+                          onChange={(e) =>
+                            setNewUserForm({
+                              ...newUserForm,
+                              phone: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           disabled={addingUser}
                         />
                       </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Last Name *
+                          Password *
                         </label>
                         <input
-                          type="text"
-                          value={newUserForm.lastName}
-                          onChange={(e) => setNewUserForm({...newUserForm, lastName: e.target.value})}
+                          type="password"
+                          value={newUserForm.password}
+                          onChange={(e) =>
+                            setNewUserForm({
+                              ...newUserForm,
+                              password: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Minimum 6 characters"
+                          disabled={addingUser}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Confirm Password *
+                        </label>
+                        <input
+                          type="password"
+                          value={newUserForm.confirmPassword}
+                          onChange={(e) =>
+                            setNewUserForm({
+                              ...newUserForm,
+                              confirmPassword: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           disabled={addingUser}
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Phone (optional)
-                      </label>
-                      <input
-                        type="tel"
-                        value={newUserForm.phone}
-                        onChange={(e) => setNewUserForm({...newUserForm, phone: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={addingUser}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Password *
-                      </label>
-                      <input
-                        type="password"
-                        value={newUserForm.password}
-                        onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Minimum 6 characters"
-                        disabled={addingUser}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirm Password *
-                      </label>
-                      <input
-                        type="password"
-                        value={newUserForm.confirmPassword}
-                        onChange={(e) => setNewUserForm({...newUserForm, confirmPassword: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={addingUser}
-                      />
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        onClick={() => setShowCreateUser(false)}
-                        disabled={addingUser}
-                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Back to Search
-                      </button>
-                      <button
-                        onClick={handleCreateAndAddUser}
-                        disabled={addingUser}
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {addingUser ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Create & Add User
-                      </button>
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          onClick={() => setShowCreateUser(false)}
+                          disabled={addingUser}
+                          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Back to Search
+                        </button>
+                        <button
+                          onClick={handleCreateAndAddUser}
+                          disabled={addingUser}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {addingUser ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Create & Add User
+                        </button>
                       </div>
                     </div>
                   )}

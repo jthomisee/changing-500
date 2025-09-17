@@ -28,7 +28,18 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { email, password, firstName, lastName, phone, isAdmin = false } = JSON.parse(event.body || '{}');
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      isAdmin = false,
+      emailGameInvitations = false,
+      emailGameResults = false,
+      phoneGameInvitations = false,
+      phoneGameResults = false
+    } = JSON.parse(event.body || '{}');
     
     // Validate required fields
     if (!password || !firstName || !lastName) {
@@ -132,15 +143,25 @@ exports.handler = async (event) => {
     
     const newUser = {
       userId,
-      email: email ? email.toLowerCase() : null,
       firstName,
       lastName,
-      phone: phone ? phone.replace(/\D/g, '') : null, // Store phone as digits only
       password: hashedPassword,
       isAdmin: Boolean(isAdmin),
+      emailGameInvitations: Boolean(emailGameInvitations),
+      emailGameResults: Boolean(emailGameResults),
+      phoneGameInvitations: Boolean(phoneGameInvitations),
+      phoneGameResults: Boolean(phoneGameResults),
       createdAt: now,
       updatedAt: now
     };
+
+    // Only include email/phone when provided to avoid NULL index key writes
+    if (email) {
+      newUser.email = email.toLowerCase();
+    }
+    if (phone) {
+      newUser.phone = phone.replace(/\D/g, '');
+    }
 
     const putParams = {
       TableName: USERS_TABLE,

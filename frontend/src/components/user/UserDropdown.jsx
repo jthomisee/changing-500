@@ -4,27 +4,22 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  Users,
   Calendar,
   Clock,
   Mail,
-  History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const UserDropdown = ({
   onProfileClick,
-  onUserManagementClick,
-  onGroupMembersClick,
   onRSVPClick,
-  onGameHistoryClick,
   selectedGroup,
   upcomingGames,
   onRSVPChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const { currentUser, handleUserLogout, isAdmin } = useAuth();
+  const { currentUser, handleUserLogout } = useAuth();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -77,31 +72,10 @@ const UserDropdown = ({
     }
   };
 
-  const handleUserManagementClick = () => {
-    setIsOpen(false);
-    if (onUserManagementClick) {
-      onUserManagementClick();
-    }
-  };
-
-  const handleGroupMembersClick = () => {
-    setIsOpen(false);
-    if (onGroupMembersClick) {
-      onGroupMembersClick();
-    }
-  };
-
   const handleRSVPClick = () => {
     setIsOpen(false);
     if (onRSVPClick) {
       onRSVPClick();
-    }
-  };
-
-  const handleGameHistoryClick = () => {
-    setIsOpen(false);
-    if (onGameHistoryClick) {
-      onGameHistoryClick();
     }
   };
 
@@ -110,9 +84,7 @@ const UserDropdown = ({
     handleUserLogout();
   };
 
-  // Check if user can manage group members
-  const canManageGroup =
-    selectedGroup && (selectedGroup.userRole === 'owner' || isAdmin);
+  // Placeholder kept for potential future logic; no admin-specific items here
 
   // Helper to format game time for display
   const formatGameTime = (game) => {
@@ -276,34 +248,6 @@ const UserDropdown = ({
               <Mail className="w-4 h-4" />
               My RSVPs
             </button>
-
-            <button
-              onClick={handleGameHistoryClick}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <History className="w-4 h-4" />
-              Game History
-            </button>
-
-            {canManageGroup && (
-              <button
-                onClick={handleGroupMembersClick}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <Users className="w-4 h-4" />
-                Group Members
-              </button>
-            )}
-
-            {isAdmin && (
-              <button
-                onClick={handleUserManagementClick}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                User Management
-              </button>
-            )}
 
             <button
               onClick={handleLogout}

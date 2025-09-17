@@ -10,7 +10,9 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    phone: ''
+    phone: '',
+    emailNotifications: false,
+    phoneNotifications: false,
   });
   const [error, setError] = useState('');
 
@@ -22,7 +24,9 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
       confirmPassword: '',
       firstName: '',
       lastName: '',
-      phone: ''
+      phone: '',
+      emailNotifications: false,
+      phoneNotifications: false,
     });
   };
 
@@ -60,8 +64,8 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
             <button
               onClick={() => setAuthMode('login')}
               className={`px-3 py-1 text-sm rounded ${
-                authMode === 'login' 
-                  ? 'bg-white shadow text-blue-600' 
+                authMode === 'login'
+                  ? 'bg-white shadow text-blue-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -70,8 +74,8 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
             <button
               onClick={() => setAuthMode('register')}
               className={`px-3 py-1 text-sm rounded ${
-                authMode === 'register' 
-                  ? 'bg-white shadow text-blue-600' 
+                authMode === 'register'
+                  ? 'bg-white shadow text-blue-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -93,7 +97,9 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
                 type="text"
                 placeholder="First Name *"
                 value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, firstName: e.target.value })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
@@ -101,19 +107,23 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
                 type="text"
                 placeholder="Last Name *"
                 value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, lastName: e.target.value })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
             </div>
           )}
-          
+
           {authMode === 'login' ? (
             <input
               type="text"
               placeholder="Email or Phone Number *"
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, username: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             />
@@ -123,7 +133,9 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
                 type="email"
                 placeholder="Email Address"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
@@ -131,7 +143,9 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
                 type="tel"
                 placeholder="Phone Number"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
@@ -140,28 +154,85 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
               </p>
             </>
           )}
-          
+
+          <input
+            type="password"
+            placeholder="Password *"
+            value={formData.password}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
+            onKeyPress={authMode === 'login' ? handleKeyPress : undefined}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading}
+          />
+
+          {authMode === 'register' && (
+            <>
               <input
                 type="password"
-                placeholder="Password *"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                onKeyPress={authMode === 'login' ? handleKeyPress : undefined}
+                placeholder="Confirm Password *"
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({ ...formData, confirmPassword: e.target.value })
+                }
+                onKeyPress={handleKeyPress}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
-              
-              {authMode === 'register' && (
-                <input
-                  type="password"
-                  placeholder="Confirm Password *"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  onKeyPress={handleKeyPress}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                />
-              )}
+
+              {/* Notification Preferences */}
+              <div className="pt-2">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">
+                  Notification Preferences
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="emailNotifications"
+                      checked={formData.emailNotifications}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          emailNotifications: e.target.checked,
+                        })
+                      }
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      disabled={loading}
+                    />
+                    <label
+                      htmlFor="emailNotifications"
+                      className="ml-2 block text-sm text-gray-900"
+                    >
+                      Email notifications (game invitations & results)
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="phoneNotifications"
+                      checked={formData.phoneNotifications}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          phoneNotifications: e.target.checked,
+                        })
+                      }
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      disabled={loading}
+                    />
+                    <label
+                      htmlFor="phoneNotifications"
+                      className="ml-2 block text-sm text-gray-900"
+                    >
+                      SMS notifications (game invitations & results)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-2 justify-end mt-6">

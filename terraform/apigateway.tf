@@ -93,6 +93,12 @@ resource "aws_api_gateway_resource" "groups_resource" {
   path_part   = "groups"
 }
 
+resource "aws_api_gateway_resource" "public_groups_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.groups_resource.id
+  path_part   = "public"
+}
+
 resource "aws_api_gateway_resource" "group_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   parent_id   = aws_api_gateway_resource.groups_resource.id
@@ -371,6 +377,34 @@ resource "aws_api_gateway_method" "groups_post_method" {
 resource "aws_api_gateway_method" "groups_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.groups_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "public_groups_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.public_groups_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "public_groups_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.public_groups_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -806,6 +840,52 @@ resource "aws_api_gateway_integration" "groups_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.groups_resource.id
   http_method = aws_api_gateway_method.groups_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "public_groups_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.public_groups_resource.id
+  http_method = aws_api_gateway_method.public_groups_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.list_public_groups.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "public_groups_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.public_groups_resource.id
+  http_method = aws_api_gateway_method.public_groups_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "group_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_resource.id
+  http_method = aws_api_gateway_method.group_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.update_group.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_resource.id
+  http_method = aws_api_gateway_method.group_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -1389,6 +1469,60 @@ resource "aws_api_gateway_integration_response" "groups_options_integration_resp
   }
 }
 
+# Public Groups CORS Responses
+resource "aws_api_gateway_method_response" "public_groups_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.public_groups_resource.id
+  http_method = aws_api_gateway_method.public_groups_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "public_groups_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.public_groups_resource.id
+  http_method = aws_api_gateway_method.public_groups_options_method.http_method
+  status_code = aws_api_gateway_method_response.public_groups_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Group CORS Responses
+resource "aws_api_gateway_method_response" "group_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_resource.id
+  http_method = aws_api_gateway_method.group_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "group_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_resource.id
+  http_method = aws_api_gateway_method.group_options_method.http_method
+  status_code = aws_api_gateway_method_response.group_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
 resource "aws_api_gateway_method_response" "group_join_options_200" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.group_join_resource.id
@@ -1751,6 +1885,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.groups_get_method.id,
       aws_api_gateway_method.groups_post_method.id,
       aws_api_gateway_method.groups_options_method.id,
+      aws_api_gateway_method.group_put_method.id,
+      aws_api_gateway_method.group_options_method.id,
       aws_api_gateway_method.group_join_post_method.id,
       aws_api_gateway_method.group_join_options_method.id,
       aws_api_gateway_method.group_members_get_method.id,
@@ -1791,6 +1927,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration.groups_get_integration.id,
       aws_api_gateway_integration.groups_post_integration.id,
       aws_api_gateway_integration.groups_options_integration.id,
+      aws_api_gateway_integration.group_put_integration.id,
+      aws_api_gateway_integration.group_options_integration.id,
       aws_api_gateway_integration.group_join_post_integration.id,
       aws_api_gateway_integration.group_join_options_integration.id,
       aws_api_gateway_integration.group_members_get_integration.id,
@@ -1806,6 +1944,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method_response.users_password_options_200.id,
       aws_api_gateway_method_response.users_reset_password_options_200.id,
       aws_api_gateway_method_response.groups_options_200.id,
+      aws_api_gateway_method_response.group_options_200.id,
       aws_api_gateway_method_response.group_join_options_200.id,
       aws_api_gateway_method_response.group_members_options_200.id,
       aws_api_gateway_method_response.group_member_options_200.id,
@@ -1926,6 +2065,15 @@ resource "aws_lambda_permission" "get_user_games_invoke_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.get_user_games.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+# Lambda Invoke Permission for Public Groups
+resource "aws_lambda_permission" "list_public_groups_invoke_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.list_public_groups.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }

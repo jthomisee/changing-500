@@ -1,6 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Edit, Users, Crown, X, Save, Loader, RotateCcw, Copy, Eye, EyeOff, Trash2, UserPlus } from 'lucide-react';
-import { listAllUsers, updateUserById, resetUserPassword, deleteUser, createUser } from '../../services/userManagementService';
+import {
+  Search,
+  Edit,
+  Users,
+  Crown,
+  X,
+  Save,
+  Loader,
+  RotateCcw,
+  Copy,
+  Eye,
+  EyeOff,
+  Trash2,
+  UserPlus,
+  Check,
+} from 'lucide-react';
+import {
+  listAllUsers,
+  updateUserById,
+  resetUserPassword,
+  deleteUser,
+  createUser,
+} from '../../services/userManagementService';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -13,7 +34,7 @@ const UserManagement = () => {
     lastName: '',
     email: '',
     phone: '',
-    isAdmin: false
+    isAdmin: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -25,6 +46,7 @@ const UserManagement = () => {
   const [tempPassword, setTempPassword] = useState('');
   const [showTempPassword, setShowTempPassword] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Delete user states
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -41,11 +63,14 @@ const UserManagement = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    isAdmin: false
+    isAdmin: false,
+    emailNotifications: false,
+    phoneNotifications: false,
   });
   const [creatingUser, setCreatingUser] = useState(false);
   const [useRandomPassword, setUseRandomPassword] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
+  const [createUserError, setCreateUserError] = useState('');
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -80,7 +105,7 @@ const UserManagement = () => {
       lastName: user.lastName || '',
       email: user.email || '',
       phone: user.phone || '',
-      isAdmin: user.isAdmin || false
+      isAdmin: user.isAdmin || false,
     });
   };
 
@@ -91,7 +116,7 @@ const UserManagement = () => {
       lastName: '',
       email: '',
       phone: '',
-      isAdmin: false
+      isAdmin: false,
     });
   };
 
@@ -103,9 +128,9 @@ const UserManagement = () => {
     try {
       const result = await updateUserById(editingUser.userId, editForm);
       if (result.success) {
-        setUsers(prev => prev.map(u => 
-          u.userId === editingUser.userId ? result.user : u
-        ));
+        setUsers((prev) =>
+          prev.map((u) => (u.userId === editingUser.userId ? result.user : u))
+        );
         closeEditModal();
         setError('');
       } else {
@@ -124,6 +149,7 @@ const UserManagement = () => {
     setShowResetConfirm(true);
     setTempPassword('');
     setShowTempPassword(false);
+    setCopied(false);
   };
 
   const handleResetPasswordConfirm = async () => {
@@ -137,9 +163,9 @@ const UserManagement = () => {
         setShowTempPassword(true);
         setShowResetConfirm(false);
         setError('');
-        setUsers(prev => prev.map(u => 
-          u.userId === resetUserId ? result.user : u
-        ));
+        setUsers((prev) =>
+          prev.map((u) => (u.userId === resetUserId ? result.user : u))
+        );
       } else {
         setError(result.error);
       }
@@ -156,11 +182,14 @@ const UserManagement = () => {
     setResetUserName('');
     setTempPassword('');
     setShowTempPassword(false);
+    setCopied(false);
   };
 
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
     }
@@ -170,11 +199,14 @@ const UserManagement = () => {
     setShowTempPassword(false);
     setTempPassword('');
     setPasswordVisible(false);
+    setCopied(false);
   };
 
   const handleDeleteUserClick = (user) => {
     setDeleteUserId(user.userId);
-    setDeleteUserName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email);
+    setDeleteUserName(
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
+    );
     setShowDeleteConfirm(true);
   };
 
@@ -184,9 +216,11 @@ const UserManagement = () => {
     setDeletingUser(true);
     try {
       const result = await deleteUser(deleteUserId);
-      
+
       if (result.success) {
-        setUsers(prevUsers => prevUsers.filter(user => user.userId !== deleteUserId));
+        setUsers((prevUsers) =>
+          prevUsers.filter((user) => user.userId !== deleteUserId)
+        );
         let message = result.message;
         if (result.warnings && result.warnings.length > 0) {
           message += '\n\nWarnings:\n' + result.warnings.join('\n');
@@ -218,7 +252,9 @@ const UserManagement = () => {
       phone: '',
       password: '',
       confirmPassword: '',
-      isAdmin: false
+      isAdmin: false,
+      emailNotifications: false,
+      phoneNotifications: false,
     });
     setShowCreateUser(true);
   };
@@ -232,23 +268,30 @@ const UserManagement = () => {
       phone: '',
       password: '',
       confirmPassword: '',
-      isAdmin: false
+      isAdmin: false,
+      emailNotifications: false,
+      phoneNotifications: false,
     });
     setUseRandomPassword(false);
     setGeneratedPassword('');
+    setCreateUserError('');
   };
 
   const generateRandomPassword = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    const chars =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
     let password = '';
     password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];  
+    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
     password += '0123456789'[Math.floor(Math.random() * 10)];
     password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
     for (let i = 4; i < 12; i++) {
       password += chars[Math.floor(Math.random() * chars.length)];
     }
-    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    password = password
+      .split('')
+      .sort(() => Math.random() - 0.5)
+      .join('');
     return password;
   };
 
@@ -256,41 +299,57 @@ const UserManagement = () => {
     const newPassword = generateRandomPassword();
     setGeneratedPassword(newPassword);
     setCreateUserForm({
-      ...createUserForm, 
+      ...createUserForm,
       password: newPassword,
-      confirmPassword: newPassword
+      confirmPassword: newPassword,
     });
     setUseRandomPassword(true);
   };
 
   const handlePasswordChange = (field, value) => {
-    setCreateUserForm({...createUserForm, [field]: value});
-    if (useRandomPassword && (field === 'password' || field === 'confirmPassword')) {
+    setCreateUserForm({ ...createUserForm, [field]: value });
+    if (
+      useRandomPassword &&
+      (field === 'password' || field === 'confirmPassword')
+    ) {
       setUseRandomPassword(false);
       setGeneratedPassword('');
     }
   };
 
   const handleCreateUserConfirm = async () => {
-    const { firstName, lastName, email, phone, password, confirmPassword, isAdmin } = createUserForm;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      password,
+      confirmPassword,
+      isAdmin,
+      emailNotifications,
+      phoneNotifications,
+    } = createUserForm;
+
+    // Clear previous errors
+    setCreateUserError('');
 
     if (!firstName || !lastName || !password) {
-      alert('First name, last name, and password are required');
+      setCreateUserError('First name, last name, and password are required');
       return;
     }
 
     if (!email && !phone) {
-      alert('Either email or phone number is required');
+      setCreateUserError('Either email or phone number is required');
       return;
     }
 
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setCreateUserError('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      alert('Password must be at least 6 characters long');
+      setCreateUserError('Password must be at least 6 characters long');
       return;
     }
 
@@ -302,29 +361,31 @@ const UserManagement = () => {
         email: email?.trim() || null,
         phone: phone?.trim() || null,
         password,
-        isAdmin
+        isAdmin,
+        // Set notification preferences
+        emailGameInvitations: emailNotifications,
+        emailGameResults: emailNotifications,
+        phoneGameInvitations: phoneNotifications,
+        phoneGameResults: phoneNotifications,
       };
 
       const result = await createUser(userData);
-      
+
       if (result.success) {
-        setUsers(prevUsers => [result.user, ...prevUsers]);
-        let successMessage = `Successfully created user: ${result.user.firstName} ${result.user.lastName}`;
-        if (useRandomPassword && generatedPassword) {
-          successMessage += `\n\nGenerated Password: ${generatedPassword}\n\nPlease share this password with the user securely.`;
-        }
-        alert(successMessage);
+        setUsers((prevUsers) => [result.user, ...prevUsers]);
         handleCreateUserCancel();
       } else {
         if (result.statusCode === 409) {
-          alert('A user with this email address or phone number already exists.');
+          setCreateUserError(
+            'A user with this email address or phone number already exists.'
+          );
         } else {
-          alert('Failed to create user: ' + result.error);
+          setCreateUserError('Failed to create user: ' + result.error);
         }
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      alert('Failed to create user: ' + error.message);
+      setCreateUserError('Failed to create user: ' + error.message);
     } finally {
       setCreatingUser(false);
     }
@@ -363,7 +424,7 @@ const UserManagement = () => {
             {loading ? <Loader className="w-4 h-4 animate-spin" /> : 'Search'}
           </button>
         </form>
-        
+
         {/* Create New User Button */}
         <button
           onClick={handleCreateUserClick}
@@ -386,12 +447,24 @@ const UserManagement = () => {
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50">
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">User</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Email</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Phone</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Role</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Created</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Actions</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                User
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                Email
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                Phone
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                Role
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                Created
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -415,7 +488,8 @@ const UserManagement = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-700 font-medium text-sm">
-                          {(user.firstName || '')[0]}{(user.lastName || '')[0]}
+                          {(user.firstName || '')[0]}
+                          {(user.lastName || '')[0]}
                         </span>
                       </div>
                       <div>
@@ -426,18 +500,26 @@ const UserManagement = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-900">{user.email}</td>
-                  <td className="px-4 py-3 text-gray-900">{user.phone || 'N/A'}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    {user.phone || 'N/A'}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      {user.isAdmin && <Crown className="w-4 h-4 text-yellow-500" />}
-                      <span className={`text-sm font-medium ${
-                        user.isAdmin ? 'text-yellow-700' : 'text-gray-700'
-                      }`}>
+                      {user.isAdmin && (
+                        <Crown className="w-4 h-4 text-yellow-500" />
+                      )}
+                      <span
+                        className={`text-sm font-medium ${
+                          user.isAdmin ? 'text-yellow-700' : 'text-gray-700'
+                        }`}
+                      >
                         {user.isAdmin ? 'Admin' : 'User'}
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-900">{formatDate(user.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    {formatDate(user.createdAt)}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button
@@ -500,7 +582,12 @@ const UserManagement = () => {
                     type="text"
                     required
                     value={editForm.firstName}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -513,7 +600,12 @@ const UserManagement = () => {
                     type="text"
                     required
                     value={editForm.lastName}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -526,7 +618,12 @@ const UserManagement = () => {
                     type="email"
                     required
                     value={editForm.email}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -538,7 +635,12 @@ const UserManagement = () => {
                   <input
                     type="tel"
                     value={editForm.phone}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -548,10 +650,18 @@ const UserManagement = () => {
                     type="checkbox"
                     id="isAdmin"
                     checked={editForm.isAdmin}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, isAdmin: e.target.checked }))}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        isAdmin: e.target.checked,
+                      }))
+                    }
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <label htmlFor="isAdmin" className="ml-2 text-sm font-medium text-gray-700 flex items-center gap-1">
+                  <label
+                    htmlFor="isAdmin"
+                    className="ml-2 text-sm font-medium text-gray-700 flex items-center gap-1"
+                  >
                     <Crown className="w-4 h-4 text-yellow-500" />
                     Admin User
                   </label>
@@ -596,7 +706,9 @@ const UserManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-red-900">Reset Password</h3>
+              <h3 className="text-lg font-semibold text-red-900">
+                Reset Password
+              </h3>
               <button
                 onClick={handleResetPasswordCancel}
                 className="text-gray-400 hover:text-gray-600"
@@ -611,21 +723,23 @@ const UserManagement = () => {
                   <RotateCcw className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Reset Password for:</p>
+                  <p className="font-medium text-gray-900">
+                    Reset Password for:
+                  </p>
                   <p className="text-sm text-gray-600">{resetUserName}</p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-yellow-800">
-                  <strong>Warning:</strong> This will generate a new temporary password. 
-                  The user will need to change it on their next login.
+                  <strong>Warning:</strong> This will generate a new temporary
+                  password. The user will need to change it on their next login.
                 </p>
               </div>
 
               <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to reset this user's password? They will receive 
-                a temporary password that must be changed on next login.
+                Are you sure you want to reset this user's password? They will
+                receive a temporary password that must be changed on next login.
               </p>
 
               <div className="flex gap-3 justify-end">
@@ -659,7 +773,9 @@ const UserManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-green-900">Password Reset Complete</h3>
+              <h3 className="text-lg font-semibold text-green-900">
+                Password Reset Complete
+              </h3>
               <button
                 onClick={closeTempPasswordModal}
                 className="text-gray-400 hover:text-gray-600"
@@ -674,42 +790,71 @@ const UserManagement = () => {
                   <RotateCcw className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">New Temporary Password</p>
+                  <p className="font-medium text-gray-900">
+                    New Temporary Password
+                  </p>
                   <p className="text-sm text-gray-600">For: {resetUserName}</p>
                 </div>
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-green-800">Temporary Password:</label>
+                  <label className="text-sm font-medium text-green-800">
+                    Temporary Password:
+                  </label>
                   <div className="flex gap-1">
                     <button
                       onClick={() => setPasswordVisible(!passwordVisible)}
                       className="text-green-600 hover:text-green-800 p-1"
-                      title={passwordVisible ? 'Hide password' : 'Show password'}
+                      title={
+                        passwordVisible ? 'Hide password' : 'Show password'
+                      }
                     >
-                      {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {passwordVisible ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                     <button
                       onClick={() => copyToClipboard(tempPassword)}
-                      className="text-green-600 hover:text-green-800 p-1"
+                      className={`p-1 rounded ${copied ? 'text-white bg-green-600' : 'text-green-600 hover:text-green-800'}`}
                       title="Copy to clipboard"
                     >
-                      <Copy className="w-4 h-4" />
+                      {copied ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
-                <div className="bg-white border border-green-300 rounded px-3 py-2">
+                <div className="bg-white border border-green-300 rounded px-3 py-2 flex items-center justify-between">
                   <code className="text-sm font-mono text-gray-900">
                     {passwordVisible ? tempPassword : '••••••••••••'}
                   </code>
+                  {useRandomPassword && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(tempPassword)}
+                      className={`ml-3 px-2 py-1 text-xs rounded flex items-center gap-1 ${copied ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white hover:bg-yellow-700'}`}
+                    >
+                      {copied ? (
+                        <Check className="w-3 h-3" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-800">
-                  <strong>Important:</strong> Please securely communicate this password to the user. 
-                  They will be required to change it on their next login.
+                  <strong>Important:</strong> Please securely communicate this
+                  password to the user. They will be required to change it on
+                  their next login.
                 </p>
               </div>
 
@@ -731,7 +876,9 @@ const UserManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-red-900">Delete User</h3>
+              <h3 className="text-lg font-semibold text-red-900">
+                Delete User
+              </h3>
               <button
                 onClick={handleDeleteUserCancel}
                 className="text-gray-400 hover:text-gray-600"
@@ -747,7 +894,9 @@ const UserManagement = () => {
                   <Trash2 className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Delete User Account</p>
+                  <p className="font-medium text-gray-900">
+                    Delete User Account
+                  </p>
                   <p className="text-sm text-gray-600">{deleteUserName}</p>
                 </div>
               </div>
@@ -757,8 +906,9 @@ const UserManagement = () => {
                   ⚠️ This action cannot be undone!
                 </p>
                 <p className="text-sm text-red-700">
-                  This will permanently delete the user account and remove them from all groups. 
-                  Any games they created or participated in will remain, but their account will be gone forever.
+                  This will permanently delete the user account and remove them
+                  from all groups. Any games they created or participated in
+                  will remain, but their account will be gone forever.
                 </p>
               </div>
 
@@ -791,9 +941,11 @@ const UserManagement = () => {
       {/* Create New User Modal */}
       {showCreateUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-green-900">Create New User</h3>
+              <h3 className="text-lg font-semibold text-green-900">
+                Create New User
+              </h3>
               <button
                 onClick={handleCreateUserCancel}
                 className="text-gray-400 hover:text-gray-600"
@@ -803,14 +955,18 @@ const UserManagement = () => {
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                   <UserPlus className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Create New Account</p>
-                  <p className="text-sm text-gray-600">Create a new user account with login credentials</p>
+                  <p className="font-medium text-gray-900">
+                    Create New Account
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Create a new user account with login credentials
+                  </p>
                 </div>
               </div>
 
@@ -824,7 +980,12 @@ const UserManagement = () => {
                     <input
                       type="text"
                       value={createUserForm.firstName}
-                      onChange={(e) => setCreateUserForm({...createUserForm, firstName: e.target.value})}
+                      onChange={(e) =>
+                        setCreateUserForm({
+                          ...createUserForm,
+                          firstName: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                       disabled={creatingUser}
                       required
@@ -837,7 +998,12 @@ const UserManagement = () => {
                     <input
                       type="text"
                       value={createUserForm.lastName}
-                      onChange={(e) => setCreateUserForm({...createUserForm, lastName: e.target.value})}
+                      onChange={(e) =>
+                        setCreateUserForm({
+                          ...createUserForm,
+                          lastName: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                       disabled={creatingUser}
                       required
@@ -853,7 +1019,12 @@ const UserManagement = () => {
                   <input
                     type="email"
                     value={createUserForm.email}
-                    onChange={(e) => setCreateUserForm({...createUserForm, email: e.target.value})}
+                    onChange={(e) =>
+                      setCreateUserForm({
+                        ...createUserForm,
+                        email: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={creatingUser}
                   />
@@ -866,7 +1037,12 @@ const UserManagement = () => {
                   <input
                     type="tel"
                     value={createUserForm.phone}
-                    onChange={(e) => setCreateUserForm({...createUserForm, phone: e.target.value})}
+                    onChange={(e) =>
+                      setCreateUserForm({
+                        ...createUserForm,
+                        phone: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={creatingUser}
                   />
@@ -893,7 +1069,9 @@ const UserManagement = () => {
                   <input
                     type="password"
                     value={createUserForm.password}
-                    onChange={(e) => handlePasswordChange('password', e.target.value)}
+                    onChange={(e) =>
+                      handlePasswordChange('password', e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={creatingUser}
                     required
@@ -913,7 +1091,9 @@ const UserManagement = () => {
                   <input
                     type="password"
                     value={createUserForm.confirmPassword}
-                    onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+                    onChange={(e) =>
+                      handlePasswordChange('confirmPassword', e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={creatingUser}
                     required
@@ -928,7 +1108,9 @@ const UserManagement = () => {
                       <div className="w-4 h-4 bg-yellow-100 rounded-full flex items-center justify-center">
                         <span className="text-xs text-yellow-600">!</span>
                       </div>
-                      <span className="text-sm font-medium text-yellow-800">Generated Password</span>
+                      <span className="text-sm font-medium text-yellow-800">
+                        Generated Password
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="font-mono text-sm bg-white border rounded p-2 flex-1">
@@ -937,15 +1119,24 @@ const UserManagement = () => {
                       <button
                         type="button"
                         onClick={() => copyToClipboard(generatedPassword)}
-                        className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center gap-1"
+                        className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                          copied
+                            ? 'bg-green-600 text-white'
+                            : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                        }`}
                         title="Copy password to clipboard"
                       >
-                        <Copy className="w-3 h-3" />
-                        Copy
+                        {copied ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                        {copied ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
                     <p className="text-xs text-yellow-700">
-                      Save this password! You'll need to share it with the user securely.
+                      Save this password! You'll need to share it with the user
+                      securely.
                     </p>
                   </div>
                 )}
@@ -956,18 +1147,84 @@ const UserManagement = () => {
                     type="checkbox"
                     id="isAdmin"
                     checked={createUserForm.isAdmin}
-                    onChange={(e) => setCreateUserForm({...createUserForm, isAdmin: e.target.checked})}
+                    onChange={(e) =>
+                      setCreateUserForm({
+                        ...createUserForm,
+                        isAdmin: e.target.checked,
+                      })
+                    }
                     className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                     disabled={creatingUser}
                   />
-                  <label htmlFor="isAdmin" className="ml-2 block text-sm text-gray-900">
+                  <label
+                    htmlFor="isAdmin"
+                    className="ml-2 block text-sm text-gray-900"
+                  >
                     Admin user (can manage all users and groups)
                   </label>
                 </div>
+
+                {/* Notification Preferences */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">
+                    Notification Preferences
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="emailNotifications"
+                        checked={createUserForm.emailNotifications}
+                        onChange={(e) =>
+                          setCreateUserForm({
+                            ...createUserForm,
+                            emailNotifications: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        disabled={creatingUser}
+                      />
+                      <label
+                        htmlFor="emailNotifications"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Email notifications (game invitations & results)
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="phoneNotifications"
+                        checked={createUserForm.phoneNotifications}
+                        onChange={(e) =>
+                          setCreateUserForm({
+                            ...createUserForm,
+                            phoneNotifications: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        disabled={creatingUser}
+                      />
+                      <label
+                        htmlFor="phoneNotifications"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        SMS notifications (game invitations & results)
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </form>
+
+              {/* Error Display */}
+              {createUserError && (
+                <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
+                  {createUserError}
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t">
+            <div className="flex justify-end gap-3 p-6 border-t flex-shrink-0">
               <button
                 onClick={handleCreateUserCancel}
                 disabled={creatingUser}

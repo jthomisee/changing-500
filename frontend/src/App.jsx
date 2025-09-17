@@ -41,6 +41,7 @@ import UpcomingGamesSection from './components/games/UpcomingGamesSection.jsx';
 import RecentGamesSection from './components/games/RecentGamesSection.jsx';
 import GameFormModal from './components/games/GameFormModal.jsx';
 import { GameProvider } from './context/GameContext.jsx';
+import MainNavigation from './components/navigation/MainNavigation.jsx';
 
 // Pages
 import RSVPPage from './pages/RSVPPage.jsx';
@@ -48,6 +49,9 @@ import TokenRSVPPage from './pages/TokenRSVPPage.jsx';
 import TermsPage from './pages/TermsPage.jsx';
 import PrivacyPage from './pages/PrivacyPage.jsx';
 import GameHistoryPage from './pages/GameHistoryPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
+import GamesPage from './pages/GamesPage.jsx';
+import GroupsPage from './pages/GroupsPage.jsx';
 
 // Services
 import {
@@ -76,6 +80,7 @@ const Changing500App = () => {
       <GroupsProvider>
         <Router>
           <Routes>
+            {/* Dashboard - New main page */}
             <Route
               path="/"
               element={
@@ -84,6 +89,48 @@ const Changing500App = () => {
                 </GamesProvider>
               }
             />
+
+            {/* Games - New tabbed interface */}
+            <Route
+              path="/games"
+              element={
+                <GamesProvider>
+                  <Changing500 />
+                </GamesProvider>
+              }
+            />
+
+            {/* Groups - Enhanced page */}
+            <Route
+              path="/groups"
+              element={
+                <GamesProvider>
+                  <Changing500 />
+                </GamesProvider>
+              }
+            />
+
+            {/* Profile */}
+            <Route
+              path="/profile"
+              element={
+                <GamesProvider>
+                  <Changing500 />
+                </GamesProvider>
+              }
+            />
+
+            {/* Admin */}
+            <Route
+              path="/admin/users"
+              element={
+                <GamesProvider>
+                  <Changing500 />
+                </GamesProvider>
+              }
+            />
+
+            {/* Legacy routes */}
             <Route
               path="/rsvp"
               element={
@@ -101,30 +148,6 @@ const Changing500App = () => {
               }
             />
             <Route path="/rsvp-token/:token" element={<TokenRSVPPage />} />
-            <Route
-              path="/profile"
-              element={
-                <GamesProvider>
-                  <Changing500 activeView="profile" />
-                </GamesProvider>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <GamesProvider>
-                  <Changing500 activeView="users" />
-                </GamesProvider>
-              }
-            />
-            <Route
-              path="/groups"
-              element={
-                <GamesProvider>
-                  <Changing500 activeView="groups" />
-                </GamesProvider>
-              }
-            />
             <Route path="/game-history" element={<GameHistoryPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
@@ -135,8 +158,8 @@ const Changing500App = () => {
   );
 };
 
-// Core App Component
-const Changing500 = ({ activeView: propActiveView }) => {
+// Core App Component - Now acts as a layout with page routing
+const Changing500 = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Authentication
@@ -244,17 +267,45 @@ const Changing500 = ({ activeView: propActiveView }) => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [gameFormError, setGameFormError] = useState('');
 
-  // Determine active view based on route or prop
-  const getActiveView = () => {
-    if (propActiveView) return propActiveView;
+  // Determine current page based on route
+  const getCurrentPage = () => {
     const path = location.pathname;
+    if (path === '/') return 'dashboard';
+    if (path.startsWith('/games')) return 'games';
+    if (path.startsWith('/groups')) return 'groups';
     if (path === '/profile') return 'profile';
-    if (path === '/admin/users') return 'users';
-    if (path === '/groups') return 'groups';
-    return 'games';
+    if (path === '/admin/users') return 'admin';
+    return 'dashboard';
   };
 
-  const activeView = getActiveView();
+  const currentPage = getCurrentPage();
+
+  // Get upcoming games for current user's groups (declare before using in pendingActions)
+  const upcomingGames = (
+    selectedGroup
+      ? scheduledGames.filter((g) => g.groupId === selectedGroup.groupId)
+      : scheduledGames
+  )
+    .filter((game) =>
+      game.results?.some((r) => r.userId === currentUser?.userId)
+    )
+    .sort((a, b) => {
+      const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
+      const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
+      return aDateTime - bDateTime;
+    });
+
+  // Calculate pending actions for navigation badge
+  const pendingActions = React.useMemo(() => {
+    if (!currentUser || !upcomingGames) return 0;
+
+    return upcomingGames.filter((game) => {
+      const userResult = game.results?.find(
+        (r) => r.userId === currentUser.userId
+      );
+      return !userResult?.rsvpStatus || userResult.rsvpStatus === 'pending';
+    }).length;
+  }, [currentUser, upcomingGames]);
 
   // Games are loaded automatically by useGamesContext when authenticated
 
@@ -339,21 +390,6 @@ const Changing500 = ({ activeView: propActiveView }) => {
     }
   };
 
-  // Get upcoming games for current user's groups
-  const upcomingGames = (
-    selectedGroup
-      ? scheduledGames.filter((g) => g.groupId === selectedGroup.groupId)
-      : scheduledGames
-  )
-    .filter((game) =>
-      game.results?.some((r) => r.userId === currentUser?.userId)
-    )
-    .sort((a, b) => {
-      const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
-      const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
-      return aDateTime - bDateTime;
-    });
-
   // Game form handlers
   const handleSaveGame = async (e) => {
     e.preventDefault();
@@ -421,10 +457,21 @@ const Changing500 = ({ activeView: propActiveView }) => {
     }
   };
 
+  // Navigation handlers
+  const handleNavigateToGames = (tab = 'schedule') => {
+    navigate(`/games?tab=${tab}`);
+  };
+
+  const handleNavigateToGroups = (tab = 'current') => {
+    navigate(`/groups?tab=${tab}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+      {/* Header - only show on certain pages */}
+      {(currentPage === 'dashboard' ||
+        currentPage === 'games' ||
+        currentPage === 'groups') && (
         <HeaderSection
           isMobile={isMobile}
           currentUser={currentUser}
@@ -442,142 +489,153 @@ const Changing500 = ({ activeView: propActiveView }) => {
           setGamesError={setGamesError}
           setShowUserAuth={setShowUserAuth}
         />
+      )}
 
-        {/* User Profile View */}
-        {activeView === 'profile' && (
-          <div className="mb-8">
+      {/* Main Navigation */}
+      <MainNavigation
+        isMobile={isMobile}
+        currentUser={currentUser}
+        isAdmin={isAdmin}
+        pendingActions={pendingActions}
+      />
+
+      {/* Main Content Area */}
+      <div
+        className={`${isMobile ? 'pb-16' : 'pl-64'} ${currentPage === 'dashboard' || currentPage === 'games' || currentPage === 'groups' ? 'pt-4' : 'pt-16'}`}
+      >
+        {/* Dashboard Page */}
+        {currentPage === 'dashboard' && (
+          <DashboardPage
+            currentUser={currentUser}
+            selectedGroup={selectedGroup}
+            upcomingGames={upcomingGames}
+            standings={standings}
+            onRSVPChange={handleRSVPChange}
+            onNavigateToGames={handleNavigateToGames}
+            onNavigateToGroups={handleNavigateToGroups}
+          />
+        )}
+
+        {/* Games Page */}
+        {currentPage === 'games' && (
+          <GamesPage
+            games={games}
+            scheduledGames={scheduledGames}
+            currentUser={currentUser}
+            selectedGroup={selectedGroup}
+            groupUsers={groupUsers}
+            isAuthenticated={isAuthenticated}
+            startEditingGame={startEditingGame}
+            deleteGame={deleteGame}
+            showAddGame={showAddGame}
+            isEditing={isEditing}
+            gameFormError={gameFormError}
+            newGame={newGame}
+            gamesLoading={gamesLoading}
+            groupUsersLoading={groupUsersLoading}
+            isGameInFuture={isGameInFuture}
+            onSave={handleSaveGame}
+            onClose={closeForm}
+            updateGameData={updateGameData}
+            updatePlayerResult={updatePlayerResult}
+            addPlayerToGame={addPlayerToGame}
+            removePlayerFromGame={removePlayerFromGame}
+            addGroupUser={addGroupUser}
+            openAddGame={openAddGame}
+            onRSVPChange={handleRSVPChange}
+            handleSendInvitations={handleSendInvitations}
+            handleSendResults={handleSendResults}
+            sendingNotifications={sendingNotifications}
+          />
+        )}
+
+        {/* Groups Page */}
+        {currentPage === 'groups' && (
+          <GroupsPage
+            currentUser={currentUser}
+            isAdmin={isAdmin}
+            groups={groups}
+            selectedGroup={selectedGroup}
+            loadingGroups={loadingGroups}
+            groupError={groupError}
+            selectGroup={selectGroup}
+            createNewGroup={createNewGroup}
+            standings={standings}
+            standingsLoading={standingsLoading}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            handleSort={handleSort}
+            expandedRows={expandedRows}
+            toggleRowExpanded={toggleRowExpanded}
+            isMobile={isMobile}
+            setShowCreateGroup={setShowCreateGroup}
+          />
+        )}
+
+        {/* Profile Page */}
+        {currentPage === 'profile' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-white border-b border-gray-200 mb-8">
+              <div className="py-6">
+                <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
+                <p className="mt-2 text-gray-600">
+                  Manage your account settings and preferences
+                </p>
+              </div>
+            </div>
             <UserProfile />
           </div>
         )}
 
-        {/* Admin User Management View */}
-        {isAdmin && activeView === 'users' && (
-          <div className="mb-8">
+        {/* Admin Page */}
+        {currentPage === 'admin' && isAdmin && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-white border-b border-gray-200 mb-8">
+              <div className="py-6">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  User Management
+                </h1>
+                <p className="mt-2 text-gray-600">
+                  Manage users and system settings
+                </p>
+              </div>
+            </div>
             <UserManagement />
           </div>
         )}
-
-        {/* Group Management View */}
-        {(selectedGroup?.userRole === 'owner' || isAdmin) &&
-          activeView === 'groups' && (
-            <div className="mb-8">
-              <GroupManagement
-                selectedGroup={selectedGroup}
-                onClose={() => navigate('/')}
-              />
-            </div>
-          )}
-
-        {/* Games View */}
-        {activeView === 'games' && (
-          <GameProvider
-            games={games}
-            scheduledGames={scheduledGames}
-            filteredGames={filteredGames}
-            currentUser={currentUser}
-            selectedGroup={selectedGroup}
-            groupUsers={groupUsers}
-            formatGameDateTime={formatGameDateTime}
-            getUserDisplayName={getUserDisplayName}
-            isGameScheduled={isGameScheduled}
-            startEditingGame={startEditingGame}
-            deleteGame={deleteGame}
-            handleSendInvitations={handleSendInvitations}
-            handleSendResults={handleSendResults}
-            handleRSVPChange={handleRSVPChange}
-            gamesLoading={gamesLoading}
-            sendingNotifications={sendingNotifications}
-            isAuthenticated={isAuthenticated}
-          >
-            {/* Add Game Button */}
-            <div className="text-center mb-8">
-              <LoadingButton
-                loading={gamesLoading}
-                onClick={openAddGame}
-                disabled={!isAuthenticated}
-                className={`px-6 py-3 rounded-lg flex items-center gap-2 mx-auto ${
-                  isAuthenticated
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                }`}
-                title={!isAuthenticated ? 'Please login to add games' : ''}
-              >
-                <Plus className="w-5 h-5" />
-                Add New Game
-              </LoadingButton>
-            </div>
-
-            {/* Group Leaderboard */}
-            <LeaderboardSection
-              isMobile={isMobile}
-              standings={standings}
-              standingsLoading={standingsLoading}
-              sortField={sortField}
-              sortDirection={sortDirection}
-              handleSort={handleSort}
-              expandedRows={expandedRows}
-              toggleRowExpanded={toggleRowExpanded}
-            />
-
-            {/* Upcoming Games */}
-            <UpcomingGamesSection />
-
-            {/* Recent Games */}
-            <RecentGamesSection openAddGame={openAddGame} />
-
-            {/* Game Form Modal */}
-            <GameFormModal
-              showAddGame={showAddGame}
-              isEditing={isEditing}
-              gameFormError={gameFormError}
-              newGame={newGame}
-              gamesLoading={gamesLoading}
-              groupUsers={groupUsers}
-              groupUsersLoading={groupUsersLoading}
-              isGameInFuture={(date, time) => isGameInFuture(date, time)}
-              onSave={handleSaveGame}
-              onClose={closeForm}
-              updateGameData={updateGameData}
-              updatePlayerResult={updatePlayerResult}
-              addPlayerToGame={addPlayerToGame}
-              removePlayerFromGame={removePlayerFromGame}
-              addGroupUser={addGroupUser}
-            />
-          </GameProvider>
-        )}
-
-        {/* Modals */}
-        <LoginModal
-          show={showUserAuth}
-          onClose={() => setShowUserAuth(false)}
-          loading={authLoading}
-          onSubmit={handleAuthSubmit}
-        />
-
-        {/* Create Group Modal */}
-        {showCreateGroup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="flex justify-between items-center p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Create New Group
-                </h3>
-                <button
-                  onClick={() => setShowCreateGroup(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <CreateGroupForm
-                onSubmit={handleCreateGroup}
-                onCancel={() => setShowCreateGroup(false)}
-              />
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Modals */}
+      <LoginModal
+        show={showUserAuth}
+        onClose={() => setShowUserAuth(false)}
+        loading={authLoading}
+        onSubmit={handleAuthSubmit}
+      />
+
+      {/* Create Group Modal */}
+      {showCreateGroup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Create New Group
+              </h3>
+              <button
+                onClick={() => setShowCreateGroup(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <CreateGroupForm
+              onSubmit={handleCreateGroup}
+              onCancel={() => setShowCreateGroup(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

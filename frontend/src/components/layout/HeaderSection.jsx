@@ -33,7 +33,12 @@ const HeaderSection = ({
             className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer w-full justify-center mb-4"
           >
             <Trophy className="w-8 h-8 text-yellow-500 flex-shrink-0" />
-            <h1 className="text-2xl font-bold text-gray-800">Changing 500</h1>
+            <h1
+              className="text-2xl font-bold text-gray-800"
+              style={{ fontFamily: 'Fredoka One, cursive' }}
+            >
+              Changing 500
+            </h1>
           </button>
 
           {/* User Actions - Below title, stacked vertically */}
@@ -67,21 +72,24 @@ const HeaderSection = ({
           </div>
         </div>
       ) : (
-        // Desktop: Horizontal layout
-        <div className="flex items-center justify-between mb-4">
-          {/* Left: App Title */}
+        // Desktop: Horizontal layout with centered title
+        <div className="flex items-center justify-center mb-4 mt-3 relative">
+          {/* Centered App Title */}
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer min-w-0"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
           >
             <Trophy className="w-10 h-10 text-yellow-500 flex-shrink-0" />
-            <h1 className="text-4xl font-bold text-gray-800 truncate">
+            <h1
+              className="text-4xl font-bold text-gray-800"
+              style={{ fontFamily: 'Fredoka One, cursive' }}
+            >
               Changing 500
             </h1>
           </button>
 
-          {/* Right: User Actions */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Right: User Actions - Positioned absolutely to not affect centering */}
+          <div className="absolute right-0 flex items-center gap-3 flex-shrink-0">
             {currentUser && (
               <GroupSelector
                 groups={groups}

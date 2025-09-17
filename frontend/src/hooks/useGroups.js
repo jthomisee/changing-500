@@ -86,7 +86,6 @@ export const useGroups = () => {
       setGroups([]);
       setSelectedGroup(null);
       setIsAdmin(false);
-      localStorage.removeItem('selectedGroupId');
     }
   }, [isAuthenticated, currentUser, loadGroups]);
 
