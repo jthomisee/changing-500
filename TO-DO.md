@@ -20,3 +20,5 @@ Getting error when joining a public group
 Error: Cannot find module 'joinGroup'
 
 If you arent logged in, dont show anything other than the Dashboard page in the nav
+
+When switching pages if it should start me at the top of the page, currently it keeps me scrolled to the position I was in on the previous page.
