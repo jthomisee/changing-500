@@ -25,23 +25,6 @@ export const useGroups = () => {
       if (result.success) {
         setGroups(result.groups);
         setIsAdmin(result.isAdmin || false);
-        
-        // Auto-select first group if none selected and groups exist
-        if (!selectedGroup && result.groups.length > 0) {
-          const storedGroupId = localStorage.getItem('selectedGroupId');
-          if (storedGroupId) {
-            const storedGroup = result.groups.find(g => g.groupId === storedGroupId);
-            if (storedGroup) {
-              setSelectedGroup(storedGroup);
-            } else {
-              setSelectedGroup(result.groups[0]);
-              localStorage.setItem('selectedGroupId', result.groups[0].groupId);
-            }
-          } else {
-            setSelectedGroup(result.groups[0]);
-            localStorage.setItem('selectedGroupId', result.groups[0].groupId);
-          }
-        }
       } else {
         setGroupError(result.error);
         setIsAdmin(false);
@@ -54,7 +37,7 @@ export const useGroups = () => {
     } finally {
       setLoadingGroups(false);
     }
-  }, [isAuthenticated, currentUser, selectedGroup]);
+  }, [isAuthenticated, currentUser]);
 
   const selectGroup = (group) => {
     setSelectedGroup(group);
@@ -75,8 +58,14 @@ export const useGroups = () => {
       const result = await createGroup(groupData);
       if (result.success) {
         // Add the new group to the list and select it
-        const newGroup = { ...result.group, userRole: 'owner', actualMember: true };
-        setGroups(prev => [...prev, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
+        const newGroup = {
+          ...result.group,
+          userRole: 'owner',
+          actualMember: true,
+        };
+        setGroups((prev) =>
+          [...prev, newGroup].sort((a, b) => a.name.localeCompare(b.name))
+        );
         setSelectedGroup(newGroup);
         localStorage.setItem('selectedGroupId', newGroup.groupId);
         return { success: true, group: newGroup };
@@ -91,11 +80,7 @@ export const useGroups = () => {
   // Load groups when authentication state changes
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      // Small delay to ensure auth token is properly set
-      const timer = setTimeout(() => {
-        loadGroups();
-      }, 100);
-      return () => clearTimeout(timer);
+      loadGroups();
     } else {
       // Clear groups when not authenticated
       setGroups([]);
@@ -110,7 +95,7 @@ export const useGroups = () => {
     if (groups.length > 0 && !selectedGroup && isAuthenticated) {
       const savedGroupId = localStorage.getItem('selectedGroupId');
       if (savedGroupId) {
-        const savedGroup = groups.find(g => g.groupId === savedGroupId);
+        const savedGroup = groups.find((g) => g.groupId === savedGroupId);
         if (savedGroup) {
           setSelectedGroup(savedGroup);
         } else {
@@ -134,6 +119,6 @@ export const useGroups = () => {
     isAdmin,
     loadGroups,
     selectGroup,
-    createNewGroup
+    createNewGroup,
   };
 };

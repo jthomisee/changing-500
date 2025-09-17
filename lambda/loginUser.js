@@ -1,14 +1,30 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
-const client = new DynamoDBClient({});
-const dynamodb = DynamoDBDocumentClient.from(client);
-const ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
+// Initialize clients outside handler for connection reuse
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  maxAttempts: 3,
+  requestTimeout: 5000
+});
+const dynamodb = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    removeUndefinedValues: true
+  }
+});
+const ssmClient = new SSMClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  maxAttempts: 3,
+  requestTimeout: 5000
+});
 
 const USERS_TABLE = process.env.USERS_TABLE_NAME;
+
+// Cache JWT secret to avoid repeated SSM calls
+let cachedJwtSecret = null;
 
 // JWT creation function
 const createJWT = (payload, secret, expiresInHours = 24) => {
@@ -36,6 +52,9 @@ const createJWT = (payload, secret, expiresInHours = 24) => {
 };
 
 exports.handler = async (event) => {
+  const startTime = Date.now();
+  console.log(`[LOGIN] Started at ${new Date().toISOString()}`);
+
   // CORS headers for all responses
   const headers = {
     'Access-Control-Allow-Origin': event.headers?.origin || '*',
@@ -67,10 +86,11 @@ exports.handler = async (event) => {
     }
 
     let user = null;
-    
+
     // Determine if username is email or phone
     const isEmail = username.includes('@');
-    
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Starting user lookup for ${isEmail ? 'email' : 'phone'}`);
+
     if (isEmail) {
       // Find user by email
       const emailQuery = {
@@ -79,10 +99,14 @@ exports.handler = async (event) => {
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: {
           ':email': username.toLowerCase()
-        }
+        },
+        Limit: 1, // Only need first match
+        ConsistentRead: false, // Eventually consistent is faster for GSI
+        ReturnConsumedCapacity: 'NONE' // Reduce response payload
       };
       const emailResult = await dynamodb.send(new QueryCommand(emailQuery));
-      if (emailResult.Items.length > 0) {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Email query completed (${emailResult.Items?.length || 0} items)`);
+      if (emailResult.Items && emailResult.Items.length > 0) {
         user = emailResult.Items[0];
       }
     } else {
@@ -94,10 +118,14 @@ exports.handler = async (event) => {
         KeyConditionExpression: 'phone = :phone',
         ExpressionAttributeValues: {
           ':phone': normalizedPhone
-        }
+        },
+        Limit: 1, // Only need first match
+        ConsistentRead: false, // Eventually consistent is faster for GSI
+        ReturnConsumedCapacity: 'NONE' // Reduce response payload
       };
       const phoneResult = await dynamodb.send(new QueryCommand(phoneQuery));
-      if (phoneResult.Items.length > 0) {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Phone query completed (${phoneResult.Items?.length || 0} items)`);
+      if (phoneResult.Items && phoneResult.Items.length > 0) {
         user = phoneResult.Items[0];
       }
     }
@@ -113,43 +141,100 @@ exports.handler = async (event) => {
     }
 
     // Verify password
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Starting password verification`);
+    const passwordStartTime = Date.now();
     const validPassword = await bcrypt.compare(password, user.password);
+    const passwordDuration = Date.now() - passwordStartTime;
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Password verification completed (took ${passwordDuration}ms)`);
+
     if (!validPassword) {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Invalid password for user`);
       return {
         statusCode: 401,
         headers,
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           error: 'Invalid username or password'
         })
       };
     }
 
-    // Get JWT secret
-    const getParameterCommand = new GetParameterCommand({
-      Name: '/changing-500/jwt-secret',
-      WithDecryption: true
-    });
+    // Check if password needs rehashing (migrate from high salt rounds to 10)
+    let needsRehash = false;
+    let currentRounds = 0;
+    try {
+      // Extract salt rounds from hash (format: $2a$rounds$salt...)
+      const hashParts = user.password.split('$');
+      if (hashParts.length >= 3) {
+        currentRounds = parseInt(hashParts[2]);
+        needsRehash = currentRounds > 10;
+      }
+    } catch (e) {
+      // Ignore errors in hash parsing
+    }
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Password analysis: ${currentRounds} rounds, needsRehash: ${needsRehash}`);
 
-    const parameterResponse = await ssmClient.send(getParameterCommand);
-    const jwtSecret = parameterResponse.Parameter.Value;
+    // Rehash password with 10 rounds for faster future logins (async, don't block response)
+    if (needsRehash) {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Starting async password rehash`);
+      // Fire and forget - don't await this operation
+      bcrypt.hash(password, 10).then(async (newHashedPassword) => {
+        try {
+          await dynamodb.send(new UpdateCommand({
+            TableName: USERS_TABLE,
+            Key: { userId: user.userId },
+            UpdateExpression: 'SET password = :password',
+            ExpressionAttributeValues: {
+              ':password': newHashedPassword
+            }
+          }));
+          console.log(`[LOGIN] Password rehash completed for user ${user.userId}`);
+        } catch (rehashError) {
+          console.warn(`[LOGIN] Failed to rehash password for user ${user.userId}:`, rehashError);
+        }
+      }).catch(hashError => {
+        console.warn(`[LOGIN] Failed to hash new password for user ${user.userId}:`, hashError);
+      });
+    }
+
+    // Get JWT secret (cached to avoid repeated SSM calls)
+    if (!cachedJwtSecret) {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Fetching JWT secret from SSM`);
+      const ssmStartTime = Date.now();
+      const getParameterCommand = new GetParameterCommand({
+        Name: '/changing-500/jwt-secret',
+        WithDecryption: true
+      });
+
+      const parameterResponse = await ssmClient.send(getParameterCommand);
+      cachedJwtSecret = parameterResponse.Parameter.Value;
+      const ssmDuration = Date.now() - ssmStartTime;
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - JWT secret fetched from SSM (took ${ssmDuration}ms)`);
+    } else {
+      console.log(`[LOGIN] ${Date.now() - startTime}ms - Using cached JWT secret`);
+    }
+
+    const jwtSecret = cachedJwtSecret;
 
     // Create JWT token
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Creating JWT token`);
     const token = createJWT(
-      { 
+      {
         userId: user.userId,
         email: user.email,
         phone: user.phone,
         role: 'user',
         isAdmin: user.isAdmin || false,
         timestamp: Date.now()
-      }, 
-      jwtSecret, 
+      },
+      jwtSecret,
       24 // 24 hours expiration
     );
 
     // Return user data without password
     const { password: _, ...userResponse } = user;
-    
+
+    console.log(`[LOGIN] ${Date.now() - startTime}ms - Login completed successfully`);
+
     return {
       statusCode: 200,
       headers,

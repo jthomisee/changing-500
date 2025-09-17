@@ -18,7 +18,17 @@ exports.handler = async (event) => {
     const qs = event.queryStringParameters || {};
     let items = [];
 
-    if ((qs.status || '').toLowerCase() === 'scheduled') {
+    if (qs.groupId) {
+      // Query games by groupId via groupId-index
+      const params = {
+        TableName: TABLE_NAME,
+        IndexName: 'groupId-index',
+        KeyConditionExpression: 'groupId = :groupId',
+        ExpressionAttributeValues: { ':groupId': qs.groupId }
+      };
+      const result = await dynamodb.send(new QueryCommand(params));
+      items = result.Items || [];
+    } else if ((qs.status || '').toLowerCase() === 'scheduled') {
       // Query scheduled games via status-date-index
       const params = {
         TableName: TABLE_NAME,
@@ -31,6 +41,7 @@ exports.handler = async (event) => {
       const result = await dynamodb.send(new QueryCommand(params));
       items = result.Items || [];
     } else {
+      // Fallback to scan for all games (less efficient)
       const params = {
         TableName: TABLE_NAME
       };

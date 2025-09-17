@@ -76,7 +76,7 @@ exports.handler = async (event) => {
     const tempPassword = generateTempPassword();
     
     // Hash the temporary password
-    const saltRounds = 12;
+    const saltRounds = 10;
     const hashedTempPassword = await bcrypt.hash(tempPassword, saltRounds);
 
     // Update user with new password and mark as requiring password change

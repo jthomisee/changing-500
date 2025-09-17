@@ -25,7 +25,7 @@ export const saveGameToDB = async (gameData) => {
   try {
     return await apiCall('/games', {
       method: 'POST',
-      body: JSON.stringify(gameData)
+      body: JSON.stringify(gameData),
     });
   } catch (error) {
     console.error('Failed to save game:', error);
@@ -37,7 +37,7 @@ export const updateGameInDB = async (gameId, gameData) => {
   try {
     return await apiCall(`/games/${gameId}`, {
       method: 'PUT',
-      body: JSON.stringify(gameData)
+      body: JSON.stringify(gameData),
     });
   } catch (error) {
     console.error('Failed to update game:', error);
@@ -48,10 +48,20 @@ export const updateGameInDB = async (gameId, gameData) => {
 export const deleteGameFromDB = async (gameId) => {
   try {
     return await apiCall(`/games/${gameId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     });
   } catch (error) {
     console.error('Failed to delete game:', error);
+    throw error;
+  }
+};
+
+export const loadUserGames = async (userId) => {
+  try {
+    const response = await apiCall(`/users/games?userId=${userId}`);
+    return response.games || [];
+  } catch (error) {
+    console.error('Failed to load user games:', error);
     throw error;
   }
 };

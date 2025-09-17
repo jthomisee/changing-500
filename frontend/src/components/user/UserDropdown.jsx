@@ -1,8 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, ChevronDown, Users, Calendar, Clock, Mail } from 'lucide-react';
+import {
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
+  Users,
+  Calendar,
+  Clock,
+  Mail,
+  History,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersClick, onRSVPClick, selectedGroup, upcomingGames, onRSVPChange }) => {
+const UserDropdown = ({
+  onProfileClick,
+  onUserManagementClick,
+  onGroupMembersClick,
+  onRSVPClick,
+  onGameHistoryClick,
+  selectedGroup,
+  upcomingGames,
+  onRSVPChange,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const { currentUser, handleUserLogout, isAdmin } = useAuth();
@@ -24,7 +43,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
   // Get user display name
   const getDisplayName = () => {
     if (!currentUser) return 'User';
-    
+
     if (currentUser.firstName && currentUser.lastName) {
       return `${currentUser.firstName} ${currentUser.lastName}`;
     } else if (currentUser.firstName) {
@@ -42,7 +61,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
   const getInitials = () => {
     const displayName = getDisplayName();
     if (displayName === 'User') return 'U';
-    
+
     const words = displayName.split(' ');
     if (words.length >= 2) {
       return `${words[0][0]}${words[1][0]}`.toUpperCase();
@@ -79,18 +98,26 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
     }
   };
 
+  const handleGameHistoryClick = () => {
+    setIsOpen(false);
+    if (onGameHistoryClick) {
+      onGameHistoryClick();
+    }
+  };
+
   const handleLogout = () => {
     setIsOpen(false);
     handleUserLogout();
   };
 
   // Check if user can manage group members
-  const canManageGroup = selectedGroup && (selectedGroup.userRole === 'owner' || isAdmin);
+  const canManageGroup =
+    selectedGroup && (selectedGroup.userRole === 'owner' || isAdmin);
 
   // Helper to format game time for display
   const formatGameTime = (game) => {
     if (!game.date) return '';
-    
+
     if (game.time) {
       // Convert UTC time to local time for display
       const utcDateTime = new Date(`${game.date}T${game.time}:00.000Z`);
@@ -99,13 +126,13 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
       });
     }
-    
+
     return new Date(game.date).toLocaleDateString(undefined, {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -118,7 +145,9 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
 
   // Get user's RSVP status for a game
   const getUserRSVP = (game) => {
-    const userResult = game.results?.find(r => r.userId === currentUser?.userId);
+    const userResult = game.results?.find(
+      (r) => r.userId === currentUser?.userId
+    );
     return userResult?.rsvpStatus || 'pending';
   };
 
@@ -137,18 +166,22 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
         <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">
           {getInitials()}
         </div>
-        
+
         {/* Name and chevron */}
         <div className="hidden sm:flex items-center gap-1">
           <span className="text-sm font-medium text-gray-700 max-w-32 truncate">
             {getDisplayName()}
           </span>
-          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
         </div>
-        
+
         {/* Mobile: just chevron */}
         <div className="sm:hidden">
-          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
         </div>
       </button>
 
@@ -177,7 +210,9 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-blue-600" />
-                <h4 className="text-sm font-medium text-gray-900">Upcoming Games</h4>
+                <h4 className="text-sm font-medium text-gray-900">
+                  Upcoming Games
+                </h4>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {upcomingGames.slice(0, 3).map((game) => {
@@ -199,7 +234,9 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
                         <span className="text-xs text-gray-600">RSVP:</span>
                         <select
                           value={userRSVP}
-                          onChange={(e) => handleRSVPChange(game.id, e.target.value)}
+                          onChange={(e) =>
+                            handleRSVPChange(game.id, e.target.value)
+                          }
                           className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -240,6 +277,14 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
               My RSVPs
             </button>
 
+            <button
+              onClick={handleGameHistoryClick}
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <History className="w-4 h-4" />
+              Game History
+            </button>
+
             {canManageGroup && (
               <button
                 onClick={handleGroupMembersClick}
@@ -249,7 +294,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
                 Group Members
               </button>
             )}
-            
+
             {isAdmin && (
               <button
                 onClick={handleUserManagementClick}
@@ -259,7 +304,7 @@ const UserDropdown = ({ onProfileClick, onUserManagementClick, onGroupMembersCli
                 User Management
               </button>
             )}
-            
+
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"

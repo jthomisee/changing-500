@@ -68,6 +68,12 @@ resource "aws_api_gateway_resource" "users_profile_resource" {
   path_part   = "profile"
 }
 
+resource "aws_api_gateway_resource" "users_games_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.users_resource.id
+  path_part   = "games"
+}
+
 resource "aws_api_gateway_resource" "users_password_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   parent_id   = aws_api_gateway_resource.users_resource.id
@@ -298,6 +304,21 @@ resource "aws_api_gateway_method" "users_profile_put_method" {
 resource "aws_api_gateway_method" "users_profile_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.users_profile_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# User Games Methods (get user's games efficiently)
+resource "aws_api_gateway_method" "users_games_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.users_games_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "users_games_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.users_games_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -1631,6 +1652,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     
     aws_api_gateway_integration.users_profile_put_integration,
     aws_api_gateway_integration.users_profile_options_integration,
+    aws_api_gateway_integration.users_games_get_integration,
+    aws_api_gateway_integration.users_games_options_integration,
     aws_api_gateway_integration.users_password_put_integration,
     aws_api_gateway_integration.users_password_options_integration,
     aws_api_gateway_integration.users_reset_password_put_integration,
@@ -1664,6 +1687,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration_response.user_manage_options_integration_response,
     
     aws_api_gateway_integration_response.users_profile_options_integration_response,
+    aws_api_gateway_integration_response.users_games_options_integration_response,
     aws_api_gateway_integration_response.users_password_options_integration_response,
     aws_api_gateway_integration_response.users_reset_password_options_integration_response,
     aws_api_gateway_integration_response.groups_options_integration_response,
@@ -1688,6 +1712,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_resource.user_manage_resource.id,
       
       aws_api_gateway_resource.users_profile_resource.id,
+      aws_api_gateway_resource.users_games_resource.id,
       aws_api_gateway_resource.users_password_resource.id,
       aws_api_gateway_resource.users_reset_password_resource.id,
       aws_api_gateway_resource.groups_resource.id,
@@ -1717,6 +1742,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.user_manage_options_method.id,
       aws_api_gateway_method.users_profile_put_method.id,
       aws_api_gateway_method.users_profile_options_method.id,
+      aws_api_gateway_method.users_games_get_method.id,
+      aws_api_gateway_method.users_games_options_method.id,
       aws_api_gateway_method.users_password_put_method.id,
       aws_api_gateway_method.users_password_options_method.id,
       aws_api_gateway_method.users_reset_password_put_method.id,
@@ -1755,6 +1782,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration.user_manage_options_integration.id,
       aws_api_gateway_integration.users_profile_put_integration.id,
       aws_api_gateway_integration.users_profile_options_integration.id,
+      aws_api_gateway_integration.users_games_get_integration.id,
+      aws_api_gateway_integration.users_games_options_integration.id,
       aws_api_gateway_integration.users_password_put_integration.id,
       aws_api_gateway_integration.users_password_options_integration.id,
       aws_api_gateway_integration.users_reset_password_put_integration.id,
@@ -1773,6 +1802,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method_response.users_manage_options_200.id,
       aws_api_gateway_method_response.user_manage_options_200.id,
       aws_api_gateway_method_response.users_profile_options_200.id,
+      aws_api_gateway_method_response.users_games_options_200.id,
       aws_api_gateway_method_response.users_password_options_200.id,
       aws_api_gateway_method_response.users_reset_password_options_200.id,
       aws_api_gateway_method_response.groups_options_200.id,
@@ -1841,4 +1871,61 @@ resource "aws_api_gateway_base_path_mapping" "api_mapping" {
   stage_name  = aws_api_gateway_stage.changing_500_api_stage.stage_name
   domain_name = aws_api_gateway_domain_name.api_domain.domain_name
   base_path   = ""  # Empty string maps root path
+}
+
+# User Games Integrations
+resource "aws_api_gateway_integration" "users_games_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.users_games_resource.id
+  http_method = aws_api_gateway_method.users_games_get_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_user_games.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "users_games_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.users_games_resource.id
+  http_method = aws_api_gateway_method.users_games_options_method.http_method
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# User Games Method Responses (for CORS)
+resource "aws_api_gateway_method_response" "users_games_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.users_games_resource.id
+  http_method = aws_api_gateway_method.users_games_options_method.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+# User Games Integration Responses (for CORS)
+resource "aws_api_gateway_integration_response" "users_games_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.users_games_resource.id
+  http_method = aws_api_gateway_method.users_games_options_method.http_method
+  status_code = aws_api_gateway_method_response.users_games_options_200.status_code
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Lambda Invoke Permission for User Games
+resource "aws_lambda_permission" "get_user_games_invoke_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_user_games.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }

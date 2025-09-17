@@ -157,7 +157,7 @@ exports.handler = async (event) => {
     } else if (email || phone) {
       // Step 3: Create full account if email/phone provided but user not found
       const randomPassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
-      const saltRounds = 12;
+      const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(randomPassword, saltRounds);
 
       const newUserId = uuidv4();

@@ -24,9 +24,20 @@ resource "aws_dynamodb_table" "games_table" {
     type = "S"
   }
 
+  attribute {
+    name = "groupId"
+    type = "S"
+  }
+
   global_secondary_index {
     name            = "date-index"
     hash_key        = "date"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "groupId-index"
+    hash_key        = "groupId"
     projection_type = "ALL"
   }
 

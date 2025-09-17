@@ -19,7 +19,7 @@ const HeaderSection = ({
   onRSVPChange,
   gamesError,
   setGamesError,
-  setShowUserAuth
+  setShowUserAuth,
 }) => {
   return (
     <div className="mb-8">
@@ -44,14 +44,13 @@ const HeaderSection = ({
                 onUserManagementClick={() => navigate('/admin/users')}
                 onGroupMembersClick={() => navigate('/groups')}
                 onRSVPClick={() => navigate('/rsvp')}
+                onGameHistoryClick={() => navigate('/game-history')}
                 selectedGroup={selectedGroup}
                 upcomingGames={upcomingGames}
                 onRSVPChange={onRSVPChange}
               />
             ) : (
-              <AuthButtons
-                onShowUserAuth={() => setShowUserAuth(true)}
-              />
+              <AuthButtons onShowUserAuth={() => setShowUserAuth(true)} />
             )}
 
             {currentUser && (
@@ -76,7 +75,9 @@ const HeaderSection = ({
             className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer min-w-0"
           >
             <Trophy className="w-10 h-10 text-yellow-500 flex-shrink-0" />
-            <h1 className="text-4xl font-bold text-gray-800 truncate">Changing 500</h1>
+            <h1 className="text-4xl font-bold text-gray-800 truncate">
+              Changing 500
+            </h1>
           </button>
 
           {/* Right: User Actions */}
@@ -99,14 +100,13 @@ const HeaderSection = ({
                 onUserManagementClick={() => navigate('/admin/users')}
                 onGroupMembersClick={() => navigate('/groups')}
                 onRSVPClick={() => navigate('/rsvp')}
+                onGameHistoryClick={() => navigate('/game-history')}
                 selectedGroup={selectedGroup}
                 upcomingGames={upcomingGames}
                 onRSVPChange={onRSVPChange}
               />
             ) : (
-              <AuthButtons
-                onShowUserAuth={() => setShowUserAuth(true)}
-              />
+              <AuthButtons onShowUserAuth={() => setShowUserAuth(true)} />
             )}
           </div>
         </div>

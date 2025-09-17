@@ -123,7 +123,7 @@ exports.handler = async (event) => {
     }
 
     // Hash password
-    const saltRounds = 12;
+    const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create user

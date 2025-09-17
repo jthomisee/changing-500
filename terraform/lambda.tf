@@ -25,6 +25,26 @@ resource "aws_lambda_function" "get_games" {
   tags = local.common_tags
 }
 
+# Get User Games Lambda Function (efficient user-specific game queries)
+resource "aws_lambda_function" "get_user_games" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-get-user-games-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "getUserGames.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      TABLE_NAME             = aws_dynamodb_table.games_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # Create Game Lambda Function
 resource "aws_lambda_function" "create_game" {
   filename         = "lambda.zip"
@@ -113,6 +133,7 @@ resource "aws_lambda_function" "login_user" {
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime         = "nodejs22.x"
   timeout         = 30
+  memory_size      = 512  # Increased from default 128MB for faster bcrypt operations
 
   environment {
     variables = {

@@ -110,7 +110,7 @@ exports.handler = async (event) => {
     }
 
     // Hash new password
-    const saltRounds = 12;
+    const saltRounds = 10;
     const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Update user password
