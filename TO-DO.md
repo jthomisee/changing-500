@@ -22,3 +22,9 @@ Error: Cannot find module 'joinGroup'
 If you arent logged in, dont show anything other than the Dashboard page in the nav
 
 When switching pages if it should start me at the top of the page, currently it keeps me scrolled to the position I was in on the previous page.
+
+When selecting Create a New group from the group switcher, its missing the public option checkbox. Shouldnt this be shared code?
+
+If there are no scheduled games, lets say something like "Sorry, there are no upcoming scheduled games in this group" on the schedule page
+
+Instead of having a manage tab for games, lets move the add new game to the schedule tab (Only shown if you are an admin or group owner) and move the Edit/Send Results/Delete functions to the history tab (again only if you are an admin or owner should these be shown)

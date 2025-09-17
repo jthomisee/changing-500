@@ -650,3 +650,11 @@ resource "aws_lambda_permission" "api_gateway_update_group" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }
+
+resource "aws_lambda_permission" "get_user_games_invoke_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.get_user_games.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}

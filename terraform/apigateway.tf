@@ -2059,21 +2059,3 @@ resource "aws_api_gateway_integration_response" "users_games_options_integration
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
-
-# Lambda Invoke Permission for User Games
-resource "aws_lambda_permission" "get_user_games_invoke_permission" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.get_user_games.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
-}
-
-# Lambda Invoke Permission for Public Groups
-resource "aws_lambda_permission" "list_public_groups_invoke_permission" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.list_public_groups.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
-}
