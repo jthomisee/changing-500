@@ -11,8 +11,11 @@ import {
 import StatsCard from '../components/common/StatsCard.jsx';
 import GameHistoryTable from '../components/games/GameHistoryTable.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
+import { useScrollToTop } from '../hooks/useScrollToTop';
 
 const GameHistoryPage = () => {
+  useScrollToTop();
+
   const { currentUser } = useAuth();
   const { groups, loadingGroups: groupsLoading } = useGroupsContext();
 
@@ -46,39 +49,11 @@ const GameHistoryPage = () => {
       return gameDate <= today && game.results && game.results.length > 0;
     });
 
-    // Convert to the format expected by calculateUserCombinedStats and GameHistoryTable
-    const userGamesWithResults = completedGames
-      .map((game) => {
-        const userResult = game.results?.find(
-          (result) => result.userId === currentUser?.userId
-        );
-
-        if (!userResult) {
-          console.warn('No user result found for game:', game.id);
-          return null;
-        }
-
-        return {
-          ...game,
-          userResult: {
-            ...userResult,
-            winnings: userResult.winnings || 0,
-            position: userResult.position || 999,
-            rebuys: userResult.rebuys || 0,
-            bestHandParticipant: userResult.bestHandParticipant || false,
-            bestHandWinner: userResult.bestHandWinner || false,
-          },
-          // Properties expected by GameHistoryTable
-          userPosition: userResult.position || 999,
-          userWinnings: userResult.winnings || 0,
-          userRebuys: userResult.rebuys || 0,
-          userBestHandParticipant: userResult.bestHandParticipant || false,
-          userBestHandWinner: userResult.bestHandWinner || false,
-          buyin: game.buyin || 20,
-          groupName: game.groupName || 'Unknown Group',
-        };
-      })
-      .filter(Boolean); // Remove null entries
+    // Filter to only games where user participated (should already be calculated by useAllUserGames)
+    const userGamesWithResults = completedGames.filter((game) => {
+      // Only include games where we have user result data
+      return game.userPosition !== undefined;
+    });
 
     const calculatedStats = calculateUserCombinedStats(
       userGamesWithResults,

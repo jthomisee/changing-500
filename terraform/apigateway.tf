@@ -129,6 +129,31 @@ resource "aws_api_gateway_resource" "group_users_resource" {
   path_part   = "users"
 }
 
+# Group Side Bets API Resources
+resource "aws_api_gateway_resource" "group_side_bets_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.group_resource.id
+  path_part   = "side-bets"
+}
+
+resource "aws_api_gateway_resource" "group_side_bet_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.group_side_bets_resource.id
+  path_part   = "{sideBetId}"
+}
+
+resource "aws_api_gateway_resource" "group_templates_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.group_resource.id
+  path_part   = "templates"
+}
+
+resource "aws_api_gateway_resource" "group_template_resource" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  parent_id   = aws_api_gateway_resource.group_templates_resource.id
+  path_part   = "{templateId}"
+}
+
 # Notifications API Resources
 resource "aws_api_gateway_resource" "notifications_resource" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
@@ -402,6 +427,13 @@ resource "aws_api_gateway_method" "group_put_method" {
   authorization = "NONE"
 }
 
+resource "aws_api_gateway_method" "group_delete_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_resource.id
+  http_method   = "DELETE"
+  authorization = "NONE"
+}
+
 resource "aws_api_gateway_method" "group_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.group_resource.id
@@ -474,9 +506,102 @@ resource "aws_api_gateway_method" "group_users_get_method" {
   authorization = "NONE"
 }
 
+resource "aws_api_gateway_method" "group_users_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_users_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
 resource "aws_api_gateway_method" "group_users_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
   resource_id   = aws_api_gateway_resource.group_users_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# Group Side Bets Methods
+resource "aws_api_gateway_method" "group_side_bets_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_side_bets_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_side_bets_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_side_bet_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_side_bet_delete_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method   = "DELETE"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_side_bet_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# Group Templates Methods
+resource "aws_api_gateway_method" "group_templates_get_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_templates_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_templates_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_templates_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_templates_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_templates_resource.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_template_put_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_template_resource.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_template_delete_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_template_resource.id
+  http_method   = "DELETE"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "group_template_options_method" {
+  rest_api_id   = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id   = aws_api_gateway_resource.group_template_resource.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -882,6 +1007,16 @@ resource "aws_api_gateway_integration" "group_put_integration" {
   uri                     = aws_lambda_function.update_group.invoke_arn
 }
 
+resource "aws_api_gateway_integration" "group_delete_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_resource.id
+  http_method = aws_api_gateway_method.group_delete_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.delete_group.invoke_arn
+}
+
 resource "aws_api_gateway_integration" "group_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.group_resource.id
@@ -996,10 +1131,154 @@ resource "aws_api_gateway_integration" "group_users_get_integration" {
   uri                     = aws_lambda_function.list_group_users.invoke_arn
 }
 
+resource "aws_api_gateway_integration" "group_users_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_users_resource.id
+  http_method = aws_api_gateway_method.group_users_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.add_group_user.invoke_arn
+}
+
 resource "aws_api_gateway_integration" "group_users_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
   resource_id = aws_api_gateway_resource.group_users_resource.id
   http_method = aws_api_gateway_method.group_users_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# Group Side Bets Integrations
+resource "aws_api_gateway_integration" "group_side_bets_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method = aws_api_gateway_method.group_side_bets_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_group_side_bets.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_side_bets_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method = aws_api_gateway_method.group_side_bets_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_group_side_bets.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_side_bets_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method = aws_api_gateway_method.group_side_bets_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "group_side_bet_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method = aws_api_gateway_method.group_side_bet_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_group_side_bets.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_side_bet_delete_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method = aws_api_gateway_method.group_side_bet_delete_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_group_side_bets.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_side_bet_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method = aws_api_gateway_method.group_side_bet_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+# Group Templates Integrations
+resource "aws_api_gateway_integration" "group_templates_get_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_templates_resource.id
+  http_method = aws_api_gateway_method.group_templates_get_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_game_templates.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_templates_post_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_templates_resource.id
+  http_method = aws_api_gateway_method.group_templates_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_game_templates.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_templates_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_templates_resource.id
+  http_method = aws_api_gateway_method.group_templates_options_method.http_method
+
+  type = "MOCK"
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_integration" "group_template_put_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_template_resource.id
+  http_method = aws_api_gateway_method.group_template_put_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_game_templates.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_template_delete_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_template_resource.id
+  http_method = aws_api_gateway_method.group_template_delete_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.manage_game_templates.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "group_template_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_template_resource.id
+  http_method = aws_api_gateway_method.group_template_options_method.http_method
 
   type = "MOCK"
   request_templates = {
@@ -1518,7 +1797,7 @@ resource "aws_api_gateway_integration_response" "group_options_integration_respo
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
@@ -1624,7 +1903,113 @@ resource "aws_api_gateway_integration_response" "group_users_options_integration
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Group Side Bets CORS
+resource "aws_api_gateway_method_response" "group_side_bets_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method = aws_api_gateway_method.group_side_bets_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "group_side_bets_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bets_resource.id
+  http_method = aws_api_gateway_method.group_side_bets_options_method.http_method
+  status_code = aws_api_gateway_method_response.group_side_bets_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "group_side_bet_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method = aws_api_gateway_method.group_side_bet_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "group_side_bet_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_side_bet_resource.id
+  http_method = aws_api_gateway_method.group_side_bet_options_method.http_method
+  status_code = aws_api_gateway_method_response.group_side_bet_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# Group Templates CORS
+resource "aws_api_gateway_method_response" "group_templates_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_templates_resource.id
+  http_method = aws_api_gateway_method.group_templates_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "group_templates_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_templates_resource.id
+  http_method = aws_api_gateway_method.group_templates_options_method.http_method
+  status_code = aws_api_gateway_method_response.group_templates_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+resource "aws_api_gateway_method_response" "group_template_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_template_resource.id
+  http_method = aws_api_gateway_method.group_template_options_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "group_template_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.changing_500_api.id
+  resource_id = aws_api_gateway_resource.group_template_resource.id
+  http_method = aws_api_gateway_method.group_template_options_method.http_method
+  status_code = aws_api_gateway_method_response.group_template_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
@@ -1805,6 +2190,18 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration.group_member_options_integration,
     aws_api_gateway_integration.group_users_get_integration,
     aws_api_gateway_integration.group_users_options_integration,
+    aws_api_gateway_integration.group_side_bets_get_integration,
+    aws_api_gateway_integration.group_side_bets_post_integration,
+    aws_api_gateway_integration.group_side_bets_options_integration,
+    aws_api_gateway_integration.group_side_bet_put_integration,
+    aws_api_gateway_integration.group_side_bet_delete_integration,
+    aws_api_gateway_integration.group_side_bet_options_integration,
+    aws_api_gateway_integration.group_templates_get_integration,
+    aws_api_gateway_integration.group_templates_post_integration,
+    aws_api_gateway_integration.group_templates_options_integration,
+    aws_api_gateway_integration.group_template_put_integration,
+    aws_api_gateway_integration.group_template_delete_integration,
+    aws_api_gateway_integration.group_template_options_integration,
     
     aws_api_gateway_integration.notifications_queue_post_integration,
     aws_api_gateway_integration.notifications_queue_options_integration,
@@ -1829,6 +2226,10 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
     aws_api_gateway_integration_response.group_members_options_integration_response,
     aws_api_gateway_integration_response.group_member_options_integration_response,
     aws_api_gateway_integration_response.group_users_options_integration_response,
+    aws_api_gateway_integration_response.group_side_bets_options_integration_response,
+    aws_api_gateway_integration_response.group_side_bet_options_integration_response,
+    aws_api_gateway_integration_response.group_templates_options_integration_response,
+    aws_api_gateway_integration_response.group_template_options_integration_response,
     
   ]
 
@@ -1855,6 +2256,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_resource.group_members_resource.id,
       aws_api_gateway_resource.group_member_resource.id,
       aws_api_gateway_resource.group_users_resource.id,
+      aws_api_gateway_resource.group_side_bets_resource.id,
+      aws_api_gateway_resource.group_side_bet_resource.id,
       
       aws_api_gateway_method.get_games_method.id,
       aws_api_gateway_method.post_games_method.id,
@@ -1886,6 +2289,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.groups_post_method.id,
       aws_api_gateway_method.groups_options_method.id,
       aws_api_gateway_method.group_put_method.id,
+      aws_api_gateway_method.group_delete_method.id,
       aws_api_gateway_method.group_options_method.id,
       aws_api_gateway_method.group_join_post_method.id,
       aws_api_gateway_method.group_join_options_method.id,
@@ -1897,6 +2301,18 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method.group_member_options_method.id,
       aws_api_gateway_method.group_users_get_method.id,
       aws_api_gateway_method.group_users_options_method.id,
+      aws_api_gateway_method.group_side_bets_get_method.id,
+      aws_api_gateway_method.group_side_bets_post_method.id,
+      aws_api_gateway_method.group_side_bets_options_method.id,
+      aws_api_gateway_method.group_side_bet_put_method.id,
+      aws_api_gateway_method.group_side_bet_delete_method.id,
+      aws_api_gateway_method.group_side_bet_options_method.id,
+      aws_api_gateway_method.group_templates_get_method.id,
+      aws_api_gateway_method.group_templates_post_method.id,
+      aws_api_gateway_method.group_templates_options_method.id,
+      aws_api_gateway_method.group_template_put_method.id,
+      aws_api_gateway_method.group_template_delete_method.id,
+      aws_api_gateway_method.group_template_options_method.id,
       
       aws_api_gateway_integration.get_games_integration.id,
       aws_api_gateway_integration.post_games_integration.id,
@@ -1928,6 +2344,7 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_integration.groups_post_integration.id,
       aws_api_gateway_integration.groups_options_integration.id,
       aws_api_gateway_integration.group_put_integration.id,
+      aws_api_gateway_integration.group_delete_integration.id,
       aws_api_gateway_integration.group_options_integration.id,
       aws_api_gateway_integration.group_join_post_integration.id,
       aws_api_gateway_integration.group_join_options_integration.id,
@@ -1949,6 +2366,8 @@ resource "aws_api_gateway_deployment" "changing_500_api_deployment" {
       aws_api_gateway_method_response.group_members_options_200.id,
       aws_api_gateway_method_response.group_member_options_200.id,
       aws_api_gateway_method_response.group_users_options_200.id,
+      aws_api_gateway_method_response.group_side_bets_options_200.id,
+      aws_api_gateway_method_response.group_side_bet_options_200.id,
       
       aws_api_gateway_method_response.notifications_queue_options_200.id,
       aws_api_gateway_method_response.rsvp_game_options_200.id,

@@ -28,8 +28,10 @@ export const useStandings = (games, users = [], isUsersLoading = false) => {
   const handleSort = (field) => {
     if (field === sortField) {
       // Toggle direction if same field
-      setSortDirection(prev => 
-        prev === SORT_DIRECTIONS.ASC ? SORT_DIRECTIONS.DESC : SORT_DIRECTIONS.ASC
+      setSortDirection((prev) =>
+        prev === SORT_DIRECTIONS.ASC
+          ? SORT_DIRECTIONS.DESC
+          : SORT_DIRECTIONS.ASC
       );
     } else {
       // New field, use default direction
@@ -50,6 +52,6 @@ export const useStandings = (games, users = [], isUsersLoading = false) => {
     sortDirection,
     handleSort,
     getSortIcon,
-    isLoading
+    isLoading,
   };
 };

@@ -65,6 +65,10 @@ exports.handler = async (event) => {
       notificationCount = await queueGameInvitationNotifications(game, group);
     } else if (notificationType === 'gameResults') {
       notificationCount = await queueGameResultsNotifications(game, group);
+    } else if (notificationType === 'waitlistPromotion') {
+      notificationCount = await queueWaitlistPromotionNotifications(game, group, triggeredBy);
+    } else if (notificationType === 'waitlistAdded') {
+      notificationCount = await queueWaitlistAddedNotifications(game, group, triggeredBy);
     }
 
     return {
@@ -158,7 +162,7 @@ async function queueGameResultsNotifications(game, group) {
 
   // Get all users who participated in this game
   const userIds = game.results?.map(r => r.userId) || [];
-  
+
   for (const userId of userIds) {
     const user = await getUser(userId);
     if (!user) continue;
@@ -196,6 +200,145 @@ async function queueGameResultsNotifications(game, group) {
       });
       count++;
     }
+  }
+
+  return count;
+}
+
+async function queueWaitlistPromotionNotifications(game, group, triggeredBy) {
+  let count = 0;
+
+  // Only send promotions for scheduled games
+  if (game.status !== 'scheduled') {
+    console.log('Game is not scheduled, skipping waitlist promotion notifications');
+    return count;
+  }
+
+  // Get all users with pending RSVP status (potential candidates for promotion notification)
+  const pendingUsers = game.results?.filter(r => r.rsvpStatus === 'pending') || [];
+  const userIds = pendingUsers.map(r => r.userId);
+
+  for (const userId of userIds) {
+    const user = await getUser(userId);
+    if (!user) continue;
+
+    // Check if user wants waitlist notifications
+    const preferences = user.notificationPreferences?.gameInvitations;
+    if (!preferences) continue;
+
+    // Generate signed RSVP token
+    const rsvpToken = await createRsvpToken({ userId, gameId: game.id });
+
+    // Queue SMS notification
+    if (preferences.sms && user.phone) {
+      await queueSMSNotification({
+        userId,
+        type: 'waitlistPromotion',
+        gameId: game.id,
+        groupName: group.name,
+        gameDate: game.date,
+        gameTime: game.time,
+        location: game.location,
+        buyin: game.buyin,
+        rsvpToken,
+        triggeredBy
+      });
+      count++;
+    }
+
+    // Queue email notification
+    if (preferences.email && user.email) {
+      await queueEmailNotification({
+        userId,
+        type: 'waitlistPromotion',
+        gameId: game.id,
+        groupName: group.name,
+        gameDate: game.date,
+        gameTime: game.time,
+        rsvpToken,
+        userEmail: user.email,
+        userName: `${user.firstName} ${user.lastName}`,
+        triggeredBy
+      });
+      count++;
+    }
+  }
+
+  return count;
+}
+
+async function queueWaitlistAddedNotifications(game, group, triggeredBy) {
+  let count = 0;
+
+  // Only send notifications for scheduled games
+  if (game.status !== 'scheduled') {
+    console.log('Game is not scheduled, skipping waitlist added notifications');
+    return count;
+  }
+
+  // Get the specific user who was added to waitlist (triggeredBy)
+  if (!triggeredBy) {
+    console.log('No triggeredBy user specified for waitlist added notification');
+    return count;
+  }
+
+  const user = await getUser(triggeredBy);
+  if (!user) {
+    console.log('User not found for waitlist added notification:', triggeredBy);
+    return count;
+  }
+
+  // Check if user wants waitlist notifications
+  const preferences = user.notificationPreferences?.gameInvitations;
+  if (!preferences) {
+    console.log('User has no notification preferences for game invitations:', triggeredBy);
+    return count;
+  }
+
+  // Find user's waitlist position
+  const userResult = game.results?.find(r => r.userId === triggeredBy);
+  const waitlistPosition = userResult?.waitlistPosition;
+
+  if (!waitlistPosition) {
+    console.log('No waitlist position found for user:', triggeredBy);
+    return count;
+  }
+
+  // Generate signed RSVP token
+  const rsvpToken = await createRsvpToken({ userId: triggeredBy, gameId: game.id });
+
+  // Queue SMS notification
+  if (preferences.sms && user.phone) {
+    await queueSMSNotification({
+      userId: triggeredBy,
+      type: 'waitlistAdded',
+      gameId: game.id,
+      groupName: group.name,
+      gameDate: game.date,
+      gameTime: game.time,
+      location: game.location,
+      buyin: game.buyin,
+      rsvpToken,
+      waitlistPosition
+    });
+    count++;
+  }
+
+  // Queue email notification
+  if (preferences.email && user.email) {
+    await queueEmailNotification({
+      userId: triggeredBy,
+      type: 'waitlistAdded',
+      gameId: game.id,
+      groupName: group.name,
+      gameDate: game.date,
+      gameTime: game.time,
+      rsvpToken,
+      userEmail: user.email,
+      userName: `${user.firstName} ${user.lastName}`,
+      waitlistPosition
+    });
+    count++;
   }
 
   return count;

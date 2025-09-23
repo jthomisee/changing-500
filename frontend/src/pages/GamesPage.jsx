@@ -14,6 +14,7 @@ import {
 import UpcomingGamesSection from '../components/games/UpcomingGamesSection.jsx';
 import GameHistoryTable from '../components/games/GameHistoryTable.jsx';
 import GameFormModal from '../components/games/GameFormModal.jsx';
+import GameDetailsModal from '../components/games/GameDetailsModal.jsx';
 import LoadingButton from '../components/common/LoadingButton.jsx';
 import { GameProvider } from '../context/GameContext.jsx';
 import { isGameScheduled } from '../utils/gameUtils.js';
@@ -70,8 +71,11 @@ const GamesPage = ({
   const activeTab = searchParams.get('tab') || 'schedule';
 
   // History scope: all | current
-  const historyScopeParam = searchParams.get('history') || 'all';
+  const historyScopeParam = searchParams.get('history') || 'current';
   const [historyScope, setHistoryScope] = useState(historyScopeParam);
+
+  // Game details modal state
+  const [selectedGameForDetails, setSelectedGameForDetails] = useState(null);
 
   // For history tab, we'll use the same hook as GameHistoryPage
   const { groups, loadingGroups } = useGroupsContext();
@@ -92,6 +96,14 @@ const GamesPage = ({
     const next = new URLSearchParams(searchParams);
     next.set('history', scope);
     setSearchParams(next);
+  };
+
+  const handleGameClick = (game) => {
+    setSelectedGameForDetails(game);
+  };
+
+  const handleCloseGameDetails = () => {
+    setSelectedGameForDetails(null);
   };
 
   // Compute filtered games for selected group (used by GameProvider consumers)
@@ -218,16 +230,6 @@ const GamesPage = ({
       icon: History,
       description: 'Past games and statistics',
     },
-    ...(selectedGroup?.userRole === 'owner' || currentUser?.isAdmin
-      ? [
-          {
-            id: 'manage',
-            label: 'Manage',
-            icon: Settings,
-            description: 'Create and manage games',
-          },
-        ]
-      : []),
   ];
 
   if (!currentUser) {
@@ -291,6 +293,26 @@ const GamesPage = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'schedule' && (
           <div>
+            {/* Add New Game Button - Only for admins or group owners */}
+            {(selectedGroup?.userRole === 'owner' || currentUser?.isAdmin) && (
+              <div className="text-center mb-8">
+                <LoadingButton
+                  loading={gamesLoading}
+                  onClick={openAddGame}
+                  disabled={!isAuthenticated}
+                  className={`px-6 py-3 rounded-lg flex items-center gap-2 mx-auto ${
+                    isAuthenticated
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  }`}
+                  title={!isAuthenticated ? 'Please login to add games' : ''}
+                >
+                  <Plus className="w-5 h-5" />
+                  Add New Game
+                </LoadingButton>
+              </div>
+            )}
+
             <GameProvider
               games={games}
               scheduledGames={scheduledGames}
@@ -408,167 +430,162 @@ const GamesPage = ({
               <GameHistoryTable
                 userGames={completedUserGames}
                 loading={userGamesLoading || loadingGroups}
+                onGameClick={handleGameClick}
               />
             </div>
+
+            {/* Game Management Section - Only for admins or group owners */}
+            {(selectedGroup?.userRole === 'owner' || currentUser?.isAdmin) && (
+              <div className="mt-8">
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <Settings className="w-6 h-6 text-blue-600" />
+                      <h2 className="text-2xl font-semibold text-gray-800">
+                        Manage Past Games
+                      </h2>
+                    </div>
+                    <p className="text-gray-600 mt-2">
+                      Edit results and send notifications for completed games in
+                      your group.
+                    </p>
+                  </div>
+
+                  {completedGames.length === 0 ? (
+                    <div className="p-6 text-center text-gray-600">
+                      No completed games yet.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                              Location
+                            </th>
+                            <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
+                              Players
+                            </th>
+                            <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
+                              Total Winnings
+                            </th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {completedGames.map((game) => {
+                            const totalWinnings = (game.results || []).reduce(
+                              (sum, r) => sum + (r.winnings || 0),
+                              0
+                            );
+                            return (
+                              <tr key={game.id}>
+                                <td className="px-4 py-3">
+                                  {formatGameDateTime(game)}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {game.location || '-'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {game.results?.length || 0}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  ${totalWinnings.toFixed(0)}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() =>
+                                        isAuthenticated &&
+                                        startEditingGame(game)
+                                      }
+                                      className={`px-3 py-2 rounded-lg flex items-center gap-2 ${
+                                        isAuthenticated
+                                          ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                                          : 'text-gray-400 cursor-not-allowed'
+                                      }`}
+                                      disabled={!isAuthenticated}
+                                      title={
+                                        isAuthenticated
+                                          ? 'Edit game'
+                                          : 'Please login to edit games'
+                                      }
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      Edit
+                                    </button>
+                                    <LoadingButton
+                                      loading={sendingNotifications}
+                                      onClick={() => handleSendResults(game.id)}
+                                      className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg flex items-center gap-1 sm:gap-2 ${
+                                        isAuthenticated
+                                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                      }`}
+                                      disabled={!isAuthenticated}
+                                      title={
+                                        isAuthenticated
+                                          ? 'Send game results'
+                                          : 'Please login to send results'
+                                      }
+                                    >
+                                      <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      <span className="hidden sm:inline">
+                                        Send Results
+                                      </span>
+                                      <span className="sm:hidden">Results</span>
+                                    </LoadingButton>
+                                    <button
+                                      onClick={() => {
+                                        console.log(
+                                          'Deleting game with ID:',
+                                          game.id,
+                                          'Full game object:',
+                                          game
+                                        );
+                                        if (
+                                          isAuthenticated &&
+                                          confirm(
+                                            `Are you sure you want to delete the game from ${formatGameDateTime(game)}? This action cannot be undone.`
+                                          )
+                                        ) {
+                                          deleteGame(game.id);
+                                        }
+                                      }}
+                                      className={`px-3 py-2 rounded-lg flex items-center gap-2 ${
+                                        isAuthenticated
+                                          ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                                          : 'text-gray-400 cursor-not-allowed'
+                                      }`}
+                                      disabled={!isAuthenticated}
+                                      title={
+                                        isAuthenticated
+                                          ? 'Delete game'
+                                          : 'Please login to delete games'
+                                      }
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
-
-        {activeTab === 'manage' &&
-          (selectedGroup?.userRole === 'owner' || currentUser?.isAdmin) && (
-            <div>
-              <div className="text-center mb-8">
-                <LoadingButton
-                  loading={gamesLoading}
-                  onClick={openAddGame}
-                  disabled={!isAuthenticated}
-                  className={`px-6 py-3 rounded-lg flex items-center gap-2 mx-auto ${
-                    isAuthenticated
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                      : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  }`}
-                  title={!isAuthenticated ? 'Please login to add games' : ''}
-                >
-                  <Plus className="w-5 h-5" />
-                  Add New Game
-                </LoadingButton>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <Settings className="w-6 h-6 text-blue-600" />
-                    <h2 className="text-2xl font-semibold text-gray-800">
-                      Manage Past Games
-                    </h2>
-                  </div>
-                  <p className="text-gray-600 mt-2">
-                    Edit results and send notifications for completed games.
-                  </p>
-                </div>
-
-                {completedGames.length === 0 ? (
-                  <div className="p-6 text-center text-gray-600">
-                    No completed games yet.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Date
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Location
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
-                            Players
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
-                            Total Winnings
-                          </th>
-                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {completedGames.map((game) => {
-                          const totalWinnings = (game.results || []).reduce(
-                            (sum, r) => sum + (r.winnings || 0),
-                            0
-                          );
-                          return (
-                            <tr key={game.id}>
-                              <td className="px-4 py-3">
-                                {formatGameDateTime(game)}
-                              </td>
-                              <td className="px-4 py-3">
-                                {game.location || '-'}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {game.results?.length || 0}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                ${totalWinnings.toFixed(0)}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    onClick={() =>
-                                      isAuthenticated && startEditingGame(game)
-                                    }
-                                    className={`px-3 py-2 rounded-lg flex items-center gap-2 ${
-                                      isAuthenticated
-                                        ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
-                                        : 'text-gray-400 cursor-not-allowed'
-                                    }`}
-                                    disabled={!isAuthenticated}
-                                    title={
-                                      isAuthenticated
-                                        ? 'Edit game'
-                                        : 'Please login to edit games'
-                                    }
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                    Edit
-                                  </button>
-                                  <LoadingButton
-                                    loading={sendingNotifications}
-                                    onClick={() => handleSendResults(game.id)}
-                                    className={`px-3 py-2 rounded-lg flex items-center gap-2 ${
-                                      isAuthenticated
-                                        ? 'bg-purple-600 text-white hover:bg-purple-700'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    }`}
-                                    disabled={!isAuthenticated}
-                                    title={
-                                      isAuthenticated
-                                        ? 'Send game results'
-                                        : 'Please login to send results'
-                                    }
-                                  >
-                                    <Mail className="w-4 h-4" />
-                                    Send Results
-                                  </LoadingButton>
-                                  <button
-                                    onClick={() => {
-                                      if (
-                                        isAuthenticated &&
-                                        confirm(
-                                          `Are you sure you want to delete the game from ${formatGameDateTime(game)}? This action cannot be undone.`
-                                        )
-                                      ) {
-                                        deleteGame(game.id);
-                                      }
-                                    }}
-                                    className={`px-3 py-2 rounded-lg flex items-center gap-2 ${
-                                      isAuthenticated
-                                        ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
-                                        : 'text-gray-400 cursor-not-allowed'
-                                    }`}
-                                    disabled={!isAuthenticated}
-                                    title={
-                                      isAuthenticated
-                                        ? 'Delete game'
-                                        : 'Please login to delete games'
-                                    }
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
       </div>
 
       {/* Game Form Modal */}
@@ -581,6 +598,7 @@ const GamesPage = ({
         groupUsers={groupUsers}
         groupUsersLoading={groupUsersLoading}
         isGameInFuture={isGameInFuture}
+        selectedGroup={selectedGroup}
         onSave={onSave}
         onClose={onClose}
         updateGameData={updateGameData}
@@ -588,6 +606,13 @@ const GamesPage = ({
         addPlayerToGame={addPlayerToGame}
         removePlayerFromGame={removePlayerFromGame}
         addGroupUser={addGroupUser}
+      />
+
+      {/* Game Details Modal */}
+      <GameDetailsModal
+        game={selectedGameForDetails}
+        onClose={handleCloseGameDetails}
+        groupUsers={groupUsers}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   Settings,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
@@ -20,19 +21,21 @@ import {
   removeGroupMember,
   addGroupMember,
   updateGroup,
+  deleteGroup,
 } from '../../services/groupService';
 import {
   searchUserByEmail,
   createUser,
 } from '../../services/userManagementService';
 
-const GroupManagement = ({ selectedGroup, onClose }) => {
+const GroupManagement = ({ selectedGroup, onClose, onGroupDeleted }) => {
   // Authentication
   const { isAdmin, currentUser } = useAuth();
 
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [updating, setUpdating] = useState(false);
 
   // Group settings state
@@ -45,6 +48,8 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [searching, setSearching] = useState(false);
   const [addingUser, setAddingUser] = useState(false);
+  const [userFormError, setUserFormError] = useState('');
+  const [userFormSuccess, setUserFormSuccess] = useState('');
 
   // New user creation form state
   const [newUserForm, setNewUserForm] = useState({
@@ -91,6 +96,8 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
     }
 
     setUpdating(true);
+    setError('');
+    setSuccessMessage('');
     try {
       const result = await updateMemberRole(
         selectedGroup.groupId,
@@ -99,11 +106,14 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       );
       if (result.success) {
         await loadMembers(); // Refresh the list
+        setSuccessMessage(
+          `${memberName} has been ${newRole === 'owner' ? 'promoted to owner' : 'demoted to member'}`
+        );
       } else {
-        alert(`Failed to update role: ${result.error}`);
+        setError(`Failed to update role: ${result.error}`);
       }
     } catch (err) {
-      alert(`Failed to update role: ${err.message}`);
+      setError(`Failed to update role: ${err.message}`);
     } finally {
       setUpdating(false);
     }
@@ -119,15 +129,18 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
     }
 
     setUpdating(true);
+    setError('');
+    setSuccessMessage('');
     try {
       const result = await removeGroupMember(selectedGroup.groupId, userId);
       if (result.success) {
         await loadMembers(); // Refresh the list
+        setSuccessMessage(`${memberName} has been removed from the group`);
       } else {
-        alert(`Failed to remove member: ${result.error}`);
+        setError(`Failed to remove member: ${result.error}`);
       }
     } catch (err) {
-      alert(`Failed to remove member: ${err.message}`);
+      setError(`Failed to remove member: ${err.message}`);
     } finally {
       setUpdating(false);
     }
@@ -136,13 +149,15 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   // Search for user by email or phone
   const handleSearchUser = async () => {
     if (!searchEmail.trim()) {
-      alert('Please enter an email address or phone number');
+      setUserFormError('Please enter an email address or phone number');
       return;
     }
 
     setSearching(true);
     setSearchResult(null);
     setShowCreateUser(false);
+    setUserFormError('');
+    setUserFormSuccess('');
 
     try {
       const result = await searchUserByEmail(searchEmail.trim());
@@ -153,7 +168,7 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
             (member) => member.email === result.user.email
           );
           if (isAlreadyMember) {
-            alert('This user is already a member of this group');
+            setUserFormError('This user is already a member of this group');
             setSearchResult(null);
           } else {
             setSearchResult(result.user);
@@ -172,10 +187,10 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
           setSearchResult(null);
         }
       } else {
-        alert(`Search failed: ${result.error}`);
+        setUserFormError(`Search failed: ${result.error}`);
       }
     } catch (err) {
-      alert(`Search failed: ${err.message}`);
+      setUserFormError(`Search failed: ${err.message}`);
     } finally {
       setSearching(false);
     }
@@ -184,6 +199,8 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
   // Add existing user to group
   const handleAddExistingUser = async (user, role = 'member') => {
     setAddingUser(true);
+    setUserFormError('');
+    setUserFormSuccess('');
     try {
       const result = await addGroupMember(
         selectedGroup.groupId,
@@ -192,15 +209,15 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       );
       if (result.success) {
         await loadMembers(); // Refresh the list
-        handleCancelAddUser(); // Close the add user form
-        alert(
+        setUserFormSuccess(
           `${user.firstName} ${user.lastName} has been added to the group!`
         );
+        handleCancelAddUser(); // Close the add user form
       } else {
-        alert(`Failed to add user: ${result.error}`);
+        setUserFormError(`Failed to add user: ${result.error}`);
       }
     } catch (err) {
-      alert(`Failed to add user: ${err.message}`);
+      setUserFormError(`Failed to add user: ${err.message}`);
     } finally {
       setAddingUser(false);
     }
@@ -214,26 +231,30 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       !newUserForm.lastName ||
       !newUserForm.password
     ) {
-      alert('Please fill in all required fields');
+      setUserFormError('Please fill in all required fields');
       return;
     }
 
     if (!newUserForm.email && !newUserForm.phone) {
-      alert('Please provide either an email address or phone number');
+      setUserFormError(
+        'Please provide either an email address or phone number'
+      );
       return;
     }
 
     if (newUserForm.password !== newUserForm.confirmPassword) {
-      alert('Passwords do not match');
+      setUserFormError('Passwords do not match');
       return;
     }
 
     if (newUserForm.password.length < 6) {
-      alert('Password must be at least 6 characters long');
+      setUserFormError('Password must be at least 6 characters long');
       return;
     }
 
     setAddingUser(true);
+    setUserFormError('');
+    setUserFormSuccess('');
     try {
       // Create the user
       const createResult = await createUser({
@@ -253,18 +274,20 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
         );
         if (addResult.success) {
           await loadMembers(); // Refresh the list
-          handleCancelAddUser(); // Close the add user form
-          alert(
+          setUserFormSuccess(
             `${newUserForm.firstName} ${newUserForm.lastName} has been created and added to the group!`
           );
+          handleCancelAddUser(); // Close the add user form
         } else {
-          alert(`User created but failed to add to group: ${addResult.error}`);
+          setUserFormError(
+            `User created but failed to add to group: ${addResult.error}`
+          );
         }
       } else {
-        alert(`Failed to create user: ${createResult.error}`);
+        setUserFormError(`Failed to create user: ${createResult.error}`);
       }
     } catch (err) {
-      alert(`Failed to create user: ${err.message}`);
+      setUserFormError(`Failed to create user: ${err.message}`);
     } finally {
       setAddingUser(false);
     }
@@ -276,6 +299,8 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
     setSearchEmail('');
     setSearchResult(null);
     setShowCreateUser(false);
+    setUserFormError('');
+    setUserFormSuccess('');
     setNewUserForm({
       email: '',
       firstName: '',
@@ -291,8 +316,11 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
     if (!selectedGroup) return;
 
     setUpdatingSettings(true);
+    setError('');
+    setSuccessMessage('');
     try {
-      const newIsPublic = !selectedGroup.isPublic;
+      const currentIsPublic = selectedGroup.isPublic === true; // Treat undefined as false
+      const newIsPublic = !currentIsPublic;
       const result = await updateGroup(selectedGroup.groupId, {
         isPublic: newIsPublic,
       });
@@ -300,12 +328,44 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
       if (result.success) {
         // Update the selectedGroup data locally
         selectedGroup.isPublic = newIsPublic;
-        alert(`Group is now ${newIsPublic ? 'public' : 'private'}`);
+        setSuccessMessage(
+          `Group visibility updated to ${newIsPublic ? 'public' : 'private'}`
+        );
       } else {
-        alert(`Failed to update group visibility: ${result.error}`);
+        setError(`Failed to update group visibility: ${result.error}`);
       }
     } catch (error) {
-      alert(`Failed to update group visibility: ${error.message}`);
+      setError(`Failed to update group visibility: ${error.message}`);
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
+  // Delete group
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup) return;
+
+    const confirmMessage = `Are you sure you want to delete the group "${selectedGroup.name}"?\n\nThis action cannot be undone and will:\n• Remove all group memberships\n• Delete ALL games associated with this group\n• Delete all game results and statistics\n\nThis is a permanent action that cannot be reversed.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setUpdatingSettings(true);
+    try {
+      const result = await deleteGroup(selectedGroup.groupId);
+      if (result.success) {
+        // Call the callback to handle post-deletion navigation
+        if (onGroupDeleted) {
+          onGroupDeleted(selectedGroup.groupId);
+        } else {
+          onClose(); // Fallback to just closing the panel
+        }
+      } else {
+        setError(`Failed to delete group: ${result.error}`);
+      }
+    } catch (error) {
+      setError(`Failed to delete group: ${error.message}`);
     } finally {
       setUpdatingSettings(false);
     }
@@ -374,6 +434,13 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
         </div>
       )}
 
+      {/* Success Display */}
+      {successMessage && (
+        <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          {successMessage}
+        </div>
+      )}
+
       {/* Group Settings */}
       {(selectedGroup?.userRole === 'owner' || isAdmin) && (
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-6 mb-6">
@@ -385,22 +452,18 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
           </div>
 
           <div className="space-y-4">
-            {/* Public/Private Toggle */}
+            {/* Public Group Toggle */}
             <div className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-gray-200">
               <div className="flex items-center gap-3">
-                {selectedGroup?.isPublic ? (
-                  <Eye className="w-5 h-5 text-green-600" />
-                ) : (
-                  <EyeOff className="w-5 h-5 text-gray-600" />
-                )}
+                <Eye
+                  className={`w-5 h-5 ${selectedGroup?.isPublic === true ? 'text-green-600' : 'text-gray-400'}`}
+                />
                 <div>
-                  <p className="font-medium text-gray-900">
-                    {selectedGroup?.isPublic ? 'Public Group' : 'Private Group'}
-                  </p>
+                  <p className="font-medium text-gray-900">Public Group</p>
                   <p className="text-sm text-gray-600">
-                    {selectedGroup?.isPublic
+                    {selectedGroup?.isPublic === true
                       ? 'Anyone can find and join this group'
-                      : 'Only invited members can join this group'}
+                      : 'Only invited members can join this group (Private)'}
                   </p>
                 </div>
               </div>
@@ -408,15 +471,45 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
               <button
                 onClick={handleTogglePublic}
                 disabled={updatingSettings}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
-                  selectedGroup?.isPublic ? 'bg-green-600' : 'bg-gray-200'
+                className={`relative inline-flex h-7 w-12 sm:h-6 sm:w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                  selectedGroup?.isPublic === true
+                    ? 'bg-green-600'
+                    : 'bg-gray-400 hover:bg-gray-500'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    selectedGroup?.isPublic ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-5 w-5 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${
+                    selectedGroup?.isPublic === true
+                      ? 'translate-x-6 sm:translate-x-6'
+                      : 'translate-x-1'
                   }`}
                 />
+              </button>
+            </div>
+
+            {/* Delete Group */}
+            <div className="flex items-center justify-between py-3 px-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="flex items-center gap-3">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <div>
+                  <p className="font-medium text-red-900">Delete Group</p>
+                  <p className="text-sm text-red-700">
+                    Permanently delete this group, all games, and remove all
+                    members. Cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDeleteGroup}
+                disabled={updatingSettings}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                {updatingSettings ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </div>
@@ -439,10 +532,10 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
             members.map((member) => (
               <div
                 key={member.userId}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-gray-200 rounded-lg"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     {member.role === 'owner' && (
                       <Crown className="w-5 h-5 text-yellow-600" />
                     )}
@@ -450,11 +543,20 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
                       <Users className="w-5 h-5 text-blue-600" />
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-gray-900">
                       {member.firstName} {member.lastName}
                     </p>
-                    <p className="text-sm text-gray-600">{member.email}</p>
+                    <p className="text-sm text-gray-600 truncate sm:whitespace-normal">
+                      <span className="hidden sm:inline">
+                        {member.email || 'No email'}
+                      </span>
+                      <span className="sm:hidden">
+                        {member.email && member.email.length > 20
+                          ? `${member.email.substring(0, 20)}...`
+                          : member.email || 'No email'}
+                      </span>
+                    </p>
                     <p className="text-xs text-gray-500">
                       {member.role === 'owner' ? '👑 Group Owner' : '👤 Member'}
                     </p>
@@ -509,6 +611,18 @@ const GroupManagement = ({ selectedGroup, onClose }) => {
             </div>
 
             <div className="p-6">
+              {/* User Form Error/Success Display */}
+              {userFormError && (
+                <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  {userFormError}
+                </div>
+              )}
+              {userFormSuccess && (
+                <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                  {userFormSuccess}
+                </div>
+              )}
+
               {/* Search for existing user */}
               {!showCreateUser && (
                 <div>

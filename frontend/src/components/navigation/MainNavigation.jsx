@@ -19,32 +19,37 @@ const MainNavigation = ({
       path: '/',
       badge: pendingActions > 0 ? pendingActions : null,
     },
-    {
-      id: 'games',
-      label: 'Games',
-      icon: Calendar,
-      path: '/games',
-    },
-    {
-      id: 'groups',
-      label: 'Groups',
-      icon: Users,
-      path: '/groups',
-    },
-    {
-      id: 'profile',
-      label: 'Profile',
-      icon: User,
-      path: '/profile',
-    },
-    ...(isAdmin
+    // Only show additional nav items if user is logged in
+    ...(currentUser
       ? [
           {
-            id: 'admin',
-            label: 'Admin',
-            icon: Settings,
-            path: '/admin/users',
+            id: 'games',
+            label: 'Games',
+            icon: Calendar,
+            path: '/games',
           },
+          {
+            id: 'groups',
+            label: 'Groups',
+            icon: Users,
+            path: '/groups',
+          },
+          {
+            id: 'profile',
+            label: 'Profile',
+            icon: User,
+            path: '/profile',
+          },
+          ...(isAdmin
+            ? [
+                {
+                  id: 'admin',
+                  label: 'Admin',
+                  icon: Settings,
+                  path: '/admin/users',
+                },
+              ]
+            : []),
         ]
       : []),
   ];
@@ -63,9 +68,20 @@ const MainNavigation = ({
 
   if (isMobile) {
     // Bottom navigation for mobile
+    const gridCols =
+      navigationItems.length === 1
+        ? 'grid-cols-1'
+        : navigationItems.length === 2
+          ? 'grid-cols-2'
+          : navigationItems.length === 3
+            ? 'grid-cols-3'
+            : navigationItems.length === 4
+              ? 'grid-cols-4'
+              : 'grid-cols-5';
+
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-        <div className="grid grid-cols-4 md:grid-cols-5">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 w-full">
+        <div className={`grid ${gridCols}`}>
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeItem === item.id;
@@ -116,10 +132,10 @@ const MainNavigation = ({
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  <div className="relative">
-                    <Icon className="w-5 h-5 mr-3" />
+                  <div className="relative mr-3">
+                    <Icon className="w-5 h-5" />
                     {item.badge && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                      <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                         {item.badge > 9 ? '9+' : item.badge}
                       </span>
                     )}

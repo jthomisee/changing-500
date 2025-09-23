@@ -27,7 +27,13 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastEvaluatedKey, setLastEvaluatedKey] = useState(null);
+  const [totalScanned, setTotalScanned] = useState(0);
+  const usersPerPage = 10;
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -35,6 +41,10 @@ const UserManagement = () => {
     email: '',
     phone: '',
     isAdmin: false,
+    emailGameInvitations: false,
+    emailGameResults: false,
+    phoneGameInvitations: false,
+    phoneGameResults: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -72,22 +82,33 @@ const UserManagement = () => {
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [createUserError, setCreateUserError] = useState('');
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const result = await listAllUsers(searchTerm);
-      if (result.success) {
-        setUsers(result.users);
-      } else {
-        setError(result.error);
+  const loadUsers = useCallback(
+    async (append = false, pageKey = null) => {
+      setLoading(true);
+      setError('');
+      try {
+        const result = await listAllUsers(searchTerm, usersPerPage, pageKey);
+        if (result.success) {
+          if (append) {
+            setUsers((prev) => [...prev, ...result.users]);
+          } else {
+            setUsers(result.users);
+            setCurrentPage(1);
+          }
+          setHasMore(result.hasMore);
+          setLastEvaluatedKey(result.lastEvaluatedKey);
+          setTotalScanned(result.totalScanned || 0);
+        } else {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError('Failed to load users');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError('Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  }, [searchTerm]);
+    },
+    [searchTerm, usersPerPage]
+  );
 
   useEffect(() => {
     loadUsers();
@@ -95,7 +116,18 @@ const UserManagement = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setUsers([]);
+    setCurrentPage(1);
+    setLastEvaluatedKey(null);
+    setHasMore(true);
     loadUsers();
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loading && lastEvaluatedKey) {
+      setCurrentPage((prev) => prev + 1);
+      loadUsers(true, lastEvaluatedKey);
+    }
   };
 
   const openEditModal = (user) => {
@@ -106,6 +138,10 @@ const UserManagement = () => {
       email: user.email || '',
       phone: user.phone || '',
       isAdmin: user.isAdmin || false,
+      emailGameInvitations: user.emailGameInvitations || false,
+      emailGameResults: user.emailGameResults || false,
+      phoneGameInvitations: user.phoneGameInvitations || false,
+      phoneGameResults: user.phoneGameResults || false,
     });
   };
 
@@ -117,6 +153,10 @@ const UserManagement = () => {
       email: '',
       phone: '',
       isAdmin: false,
+      emailGameInvitations: false,
+      emailGameResults: false,
+      phoneGameInvitations: false,
+      phoneGameResults: false,
     });
   };
 
@@ -225,14 +265,17 @@ const UserManagement = () => {
         if (result.warnings && result.warnings.length > 0) {
           message += '\n\nWarnings:\n' + result.warnings.join('\n');
         }
-        alert(message);
+        setSuccessMessage(message);
+        setError('');
         handleDeleteUserCancel();
       } else {
-        alert('Failed to delete user: ' + result.error);
+        setError('Failed to delete user: ' + result.error);
+        setSuccessMessage('');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Failed to delete user: ' + error.message);
+      setError('Failed to delete user: ' + error.message);
+      setSuccessMessage('');
     } finally {
       setDeletingUser(false);
     }
@@ -442,8 +485,15 @@ const UserManagement = () => {
         </div>
       )}
 
-      {/* Users Table */}
-      <div className="overflow-x-auto">
+      {/* Success Display */}
+      {successMessage && (
+        <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded whitespace-pre-line">
+          {successMessage}
+        </div>
+      )}
+
+      {/* Users Table - Desktop View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50">
@@ -552,9 +602,79 @@ const UserManagement = () => {
         </table>
       </div>
 
+      {/* Users List - Mobile View */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="py-8 text-center text-gray-500">
+            <Loader className="w-6 h-6 animate-spin mx-auto mb-2" />
+            Loading users...
+          </div>
+        ) : users.length === 0 ? (
+          <div className="py-8 text-center text-gray-500">No users found</div>
+        ) : (
+          users.map((user) => (
+            <div
+              key={user.userId}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-700 font-medium text-sm">
+                      {(user.firstName || '')[0]}
+                      {(user.lastName || '')[0]}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 truncate">
+                      {user.firstName} {user.lastName}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {user.isAdmin && (
+                        <Crown className="w-4 h-4 text-yellow-500" />
+                      )}
+                      <span
+                        className={`text-xs font-medium ${
+                          user.isAdmin ? 'text-yellow-700' : 'text-gray-600'
+                        }`}
+                      >
+                        {user.isAdmin ? 'Admin' : 'User'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openEditModal(user)}
+                  className="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+                  title="View/Edit user"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {users.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600 text-center">
-          Showing {users.length} user{users.length !== 1 ? 's' : ''}
+        <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-sm text-gray-600">
+            Showing {users.length} user{users.length !== 1 ? 's' : ''}
+            {totalScanned > 0 && ` (scanned ${totalScanned} records)`}
+          </div>
+          {hasMore && (
+            <button
+              onClick={handleLoadMore}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                'Load More Users'
+              )}
+            </button>
+          )}
         </div>
       )}
 
@@ -666,6 +786,95 @@ const UserManagement = () => {
                     Admin User
                   </label>
                 </div>
+
+                {/* Notification Preferences */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">
+                    Notification Preferences
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="editEmailGameInvitations"
+                        checked={editForm.emailGameInvitations}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            emailGameInvitations: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="editEmailGameInvitations"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Email game invitations
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="editEmailGameResults"
+                        checked={editForm.emailGameResults}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            emailGameResults: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="editEmailGameResults"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        Email game results
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="editPhoneGameInvitations"
+                        checked={editForm.phoneGameInvitations}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            phoneGameInvitations: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="editPhoneGameInvitations"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        SMS game invitations
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="editPhoneGameResults"
+                        checked={editForm.phoneGameResults}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            phoneGameResults: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="editPhoneGameResults"
+                        className="ml-2 block text-sm text-gray-900"
+                      >
+                        SMS game results
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {error && (
@@ -673,6 +882,34 @@ const UserManagement = () => {
                   {error}
                 </div>
               )}
+
+              {/* Mobile Action Buttons */}
+              <div className="md:hidden flex gap-2 mb-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeEditModal();
+                    handleResetPasswordClick(editingUser);
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset Password
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeEditModal();
+                    handleDeleteUserClick(editingUser);
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete User
+                </button>
+              </div>
 
               <div className="flex gap-3 justify-end mt-6">
                 <button

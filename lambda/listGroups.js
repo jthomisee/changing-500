@@ -39,6 +39,8 @@ exports.handler = async (event) => {
 
     const userId = authResult.payload?.userId;
     const isAdmin = authResult.payload?.isAdmin || false;
+    const { limit = '10', lastEvaluatedKey } = event.queryStringParameters || {};
+    const requestedLimit = parseInt(limit);
 
     if (!userId) {
       return {
@@ -49,15 +51,31 @@ exports.handler = async (event) => {
     }
 
     let groups = [];
+    let lastKey = null;
+
+    // Add pagination support
+    const paginationParams = {
+      Limit: requestedLimit
+    };
+
+    if (lastEvaluatedKey) {
+      try {
+        paginationParams.ExclusiveStartKey = JSON.parse(decodeURIComponent(lastEvaluatedKey));
+      } catch (error) {
+        console.error('Invalid lastEvaluatedKey:', error);
+      }
+    }
 
     if (isAdmin) {
       // Admin: Return all groups in the system
       const allGroupsQuery = {
-        TableName: GROUPS_TABLE
+        TableName: GROUPS_TABLE,
+        ...paginationParams
       };
-      
+
       const allGroupsResult = await dynamodb.send(new ScanCommand(allGroupsQuery));
       const allGroups = allGroupsResult.Items || [];
+      lastKey = allGroupsResult.LastEvaluatedKey;
 
       // Get admin's actual memberships to distinguish between admin-view and member
       const userGroupsQuery = {
@@ -92,10 +110,11 @@ exports.handler = async (event) => {
       // Mark each group with admin's relationship to it and actual member count
       groups = allGroups.map(group => ({
         ...group,
+        isPublic: group.isPublic === 'true', // Convert string to boolean
         memberCount: memberCounts.get(group.groupId) || 0, // Dynamic count
         userRole: membershipMap.has(group.groupId) ? membershipMap.get(group.groupId) : 'admin-view',
         actualMember: membershipMap.has(group.groupId),
-        joinedAt: membershipMap.has(group.groupId) ? 
+        joinedAt: membershipMap.has(group.groupId) ?
           userMemberships.find(m => m.groupId === group.groupId)?.joinedAt : null
       }));
 
@@ -149,6 +168,7 @@ exports.handler = async (event) => {
           if (groupResult.Item) {
             groups.push({
               ...groupResult.Item,
+              isPublic: groupResult.Item.isPublic === 'true', // Convert string to boolean
               memberCount: memberCounts.get(membership.groupId) || 0, // Dynamic count
               userRole: membership.role || 'member',
               actualMember: true,
@@ -165,14 +185,24 @@ exports.handler = async (event) => {
     // Sort groups by name
     groups.sort((a, b) => a.name.localeCompare(b.name));
 
+    const response = {
+      groups: groups,
+      count: groups.length,
+      isAdmin
+    };
+
+    // Add pagination info if there are more results
+    if (lastKey) {
+      response.lastEvaluatedKey = encodeURIComponent(JSON.stringify(lastKey));
+      response.hasMore = true;
+    } else {
+      response.hasMore = false;
+    }
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        groups: groups,
-        count: groups.length,
-        isAdmin
-      })
+      body: JSON.stringify(response)
     };
 
   } catch (error) {

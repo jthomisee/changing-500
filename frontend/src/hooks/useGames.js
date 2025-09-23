@@ -14,17 +14,24 @@ export const useGames = () => {
   const [scheduledGames, setScheduledGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasMoreGames, setHasMoreGames] = useState(false);
+  const [hasMoreScheduled, setHasMoreScheduled] = useState(false);
+  const [gamesLastKey, setGamesLastKey] = useState(null);
+  const [scheduledLastKey, setScheduledLastKey] = useState(null);
 
-  // Load all games from API
+  // Load all games from API (backward compatibility - loads all at once)
   const loadAllGames = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const loadedGames = await loadGames();
-      setGames(loadedGames);
+      // Load with high limit to get all games for backward compatibility
+      const result = await loadGames(1000);
+      setGames(result.games);
+      setHasMoreGames(result.hasMore);
+      setGamesLastKey(result.lastEvaluatedKey);
 
       // Filter scheduled games client-side instead of making separate API call
-      const scheduledGames = loadedGames.filter(
+      const scheduledGames = result.games.filter(
         (game) => game.status && game.status.toLowerCase() === 'scheduled'
       );
       setScheduledGames(scheduledGames);
@@ -35,6 +42,41 @@ export const useGames = () => {
       setLoading(false);
     }
   }, []);
+
+  // Load games with pagination (for history pages)
+  const loadGamesPaginated = useCallback(
+    async (limit = 10, append = false, groupId = null) => {
+      setLoading(true);
+      setError('');
+      try {
+        const result = await loadGames(
+          limit,
+          append ? gamesLastKey : null,
+          groupId
+        );
+        if (append) {
+          setGames((prev) => [...prev, ...result.games]);
+        } else {
+          setGames(result.games);
+        }
+        setHasMoreGames(result.hasMore);
+        setGamesLastKey(result.lastEvaluatedKey);
+      } catch (err) {
+        console.error('Failed to load games:', err);
+        setError('Failed to load games. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [gamesLastKey]
+  );
+
+  // Load more games for pagination
+  const loadMoreGames = useCallback(async () => {
+    if (hasMoreGames && !loading) {
+      await loadGamesPaginated(20, true);
+    }
+  }, [hasMoreGames, loading, loadGamesPaginated]);
 
   // Save a new game
   const saveGame = async (gameData) => {
@@ -149,6 +191,10 @@ export const useGames = () => {
     error,
     setError,
     loadAllGames,
+    loadGamesPaginated,
+    loadMoreGames,
+    hasMoreGames,
+    hasMoreScheduled,
     saveGame,
     updateGame,
     deleteGame,

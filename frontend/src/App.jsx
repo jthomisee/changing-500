@@ -13,7 +13,6 @@ import {
   Users,
   Edit,
   Trash2,
-  X,
   Save,
   Loader,
   MapPin,
@@ -52,6 +51,7 @@ import GameHistoryPage from './pages/GameHistoryPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import GamesPage from './pages/GamesPage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
+import SMSVerificationPage from './pages/SMSVerificationPage.jsx';
 
 // Services
 import {
@@ -59,6 +59,7 @@ import {
   triggerGameResults,
 } from './services/notificationService';
 import GroupManagement from './components/groups/GroupManagement.jsx';
+import GroupFormModal from './components/groups/GroupFormModal.jsx';
 
 // Utils
 import { isGameScheduled } from './utils/gameUtils';
@@ -121,14 +122,7 @@ const Changing500App = () => {
             />
 
             {/* Admin */}
-            <Route
-              path="/admin/users"
-              element={
-                <GamesProvider>
-                  <Changing500 />
-                </GamesProvider>
-              }
-            />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
 
             {/* Legacy routes */}
             <Route
@@ -151,6 +145,7 @@ const Changing500App = () => {
             <Route path="/game-history" element={<GameHistoryPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/sms-verification" element={<SMSVerificationPage />} />
           </Routes>
         </Router>
       </GroupsProvider>
@@ -162,6 +157,12 @@ const Changing500App = () => {
 const Changing500 = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   // Authentication
   const { isAdmin, currentUser, loading: authLoading } = useAuth();
 
@@ -213,6 +214,31 @@ const Changing500 = () => {
     handleSort,
     isLoading: standingsLoading,
   } = useStandings(filteredGames, groupUsers, groupUsersLoading);
+
+  // Create separate standings for tournament and cash games
+  const {
+    standings: tournamentStandings,
+    sortField: tournamentSortField,
+    sortDirection: tournamentSortDirection,
+    handleSort: handleTournamentSort,
+    isLoading: tournamentStandingsLoading,
+  } = useStandings(
+    filteredGames.filter((game) => game.gameType !== 'cash'),
+    groupUsers,
+    groupUsersLoading
+  );
+
+  const {
+    standings: cashStandings,
+    sortField: cashSortField,
+    sortDirection: cashSortDirection,
+    handleSort: handleCashSort,
+    isLoading: cashStandingsLoading,
+  } = useStandings(
+    filteredGames.filter((game) => game.gameType === 'cash'),
+    groupUsers,
+    groupUsersLoading
+  );
 
   // Mobile expandable rows state
   const [expandedRows, setExpandedRows] = useState(new Set());
@@ -274,7 +300,6 @@ const Changing500 = () => {
     if (path.startsWith('/games')) return 'games';
     if (path.startsWith('/groups')) return 'groups';
     if (path === '/profile') return 'profile';
-    if (path === '/admin/users') return 'admin';
     return 'dashboard';
   };
 
@@ -443,20 +468,6 @@ const Changing500 = () => {
     }
   };
 
-  // Group creation handler
-  const handleCreateGroup = async (groupData) => {
-    try {
-      const result = await createNewGroup(groupData);
-      if (result.success) {
-        setShowCreateGroup(false);
-        return { success: true };
-      }
-      return result;
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
   // Navigation handlers
   const handleNavigateToGames = (tab = 'schedule') => {
     navigate(`/games?tab=${tab}`);
@@ -508,6 +519,7 @@ const Changing500 = () => {
           <DashboardPage
             currentUser={currentUser}
             selectedGroup={selectedGroup}
+            groups={groups}
             upcomingGames={upcomingGames}
             standings={standings}
             onRSVPChange={handleRSVPChange}
@@ -565,6 +577,16 @@ const Changing500 = () => {
             sortField={sortField}
             sortDirection={sortDirection}
             handleSort={handleSort}
+            tournamentStandings={tournamentStandings}
+            tournamentStandingsLoading={tournamentStandingsLoading}
+            tournamentSortField={tournamentSortField}
+            tournamentSortDirection={tournamentSortDirection}
+            handleTournamentSort={handleTournamentSort}
+            cashStandings={cashStandings}
+            cashStandingsLoading={cashStandingsLoading}
+            cashSortField={cashSortField}
+            cashSortDirection={cashSortDirection}
+            handleCashSort={handleCashSort}
             expandedRows={expandedRows}
             toggleRowExpanded={toggleRowExpanded}
             isMobile={isMobile}
@@ -586,23 +608,6 @@ const Changing500 = () => {
             <UserProfile />
           </div>
         )}
-
-        {/* Admin Page */}
-        {currentPage === 'admin' && isAdmin && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="bg-white border-b border-gray-200 mb-8">
-              <div className="py-6">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  User Management
-                </h1>
-                <p className="mt-2 text-gray-600">
-                  Manage users and system settings
-                </p>
-              </div>
-            </div>
-            <UserManagement />
-          </div>
-        )}
       </div>
 
       {/* Modals */}
@@ -614,131 +619,66 @@ const Changing500 = () => {
       />
 
       {/* Create Group Modal */}
-      {showCreateGroup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Create New Group
-              </h3>
-              <button
-                onClick={() => setShowCreateGroup(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <CreateGroupForm
-              onSubmit={handleCreateGroup}
-              onCancel={() => setShowCreateGroup(false)}
-            />
-          </div>
-        </div>
-      )}
+      <GroupFormModal
+        show={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        onGroupCreated={(newGroup) => {
+          setShowCreateGroup(false);
+          // Optionally refresh groups or handle the new group
+        }}
+      />
     </div>
   );
 };
 
-// Create Group Form Component
-const CreateGroupForm = ({ onSubmit, onCancel }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+// Standalone Admin Users Page - minimal providers needed
+const AdminUsersPage = () => {
+  const { isAdmin, currentUser } = useAuth();
+  const { isMobile } = useMobileDetection();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.name.trim()) {
-      setError('Group name is required');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await onSubmit(formData);
-      if (result.success) {
-        setFormData({ name: '', description: '' });
-      } else {
-        setError(result.error || 'Failed to create group');
-      }
-    } catch (err) {
-      setError('Failed to create group');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            Access Denied
+          </h1>
+          <p className="text-gray-600">
+            You don't have permission to access this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="p-6">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Group Name *
-          </label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, name: e.target.value }))
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter group name"
-            disabled={loading}
-          />
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Main Navigation */}
+      <MainNavigation
+        isMobile={isMobile}
+        currentUser={currentUser}
+        isAdmin={isAdmin}
+        pendingActions={0}
+      />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description (Optional)
-          </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, description: e.target.value }))
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Describe your group"
-            rows="3"
-            disabled={loading}
-          />
-        </div>
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
+      {/* Main Content Area */}
+      <div className={`${isMobile ? 'pb-16' : 'pl-64'} pt-16`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white border-b border-gray-200 mb-8">
+            <div className="py-6">
+              <h1 className="text-3xl font-bold text-gray-900">
+                User Management
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Manage users and system settings
+              </p>
+            </div>
           </div>
-        )}
+          <UserManagement />
+        </div>
       </div>
-
-      <div className="flex gap-3 justify-end mt-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={loading}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={loading || !formData.name.trim()}
-          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <Loader className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          {loading ? 'Creating...' : 'Create Group'}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 };
 

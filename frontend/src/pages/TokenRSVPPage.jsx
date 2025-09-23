@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Users, CheckCircle, XCircle, Clock, MapPin, DollarSign, ArrowLeft } from 'lucide-react';
+import {
+  Calendar,
+  Users,
+  CheckCircle,
+  XCircle,
+  Clock,
+  MapPin,
+  DollarSign,
+  ArrowLeft,
+} from 'lucide-react';
 import { apiCall } from '../services/api';
 import LoadingButton from '../components/common/LoadingButton.jsx';
 import { formatGameDateTime } from '../utils/dateUtils';
+import { useScrollToTop } from '../hooks/useScrollToTop';
 
 const TokenRSVPPage = () => {
+  useScrollToTop();
+
   const { token } = useParams();
   const navigate = useNavigate();
   const [game, setGame] = useState(null);
@@ -24,7 +36,7 @@ const TokenRSVPPage = () => {
   const loadGameFromToken = async () => {
     try {
       const response = await apiCall(`/rsvp-token/${token}`, {
-        method: 'GET'
+        method: 'GET',
       });
 
       if (response.success) {
@@ -50,17 +62,37 @@ const TokenRSVPPage = () => {
     try {
       const response = await apiCall(`/rsvp-token/${token}/respond`, {
         method: 'PUT',
-        body: JSON.stringify({ rsvpStatus })
+        body: JSON.stringify({ rsvpStatus }),
       });
 
       if (response.success) {
-        setMessage(`RSVP updated successfully! You are ${rsvpStatus === 'yes' ? 'attending' : 'not attending'}.`);
+        // Check if user was waitlisted
+        if (response.rsvpStatus === 'waitlisted' && response.waitlistPosition) {
+          setMessage(
+            `You've been added to the waitlist at position #${response.waitlistPosition}. We'll notify you if a spot opens up!`
+          );
+        } else {
+          setMessage(
+            response.message ||
+              `RSVP updated successfully! You are ${rsvpStatus === 'yes' ? 'attending' : 'not attending'}.`
+          );
+        }
+
         // Update the game state to reflect the new RSVP status
-        setGame(prev => ({
+        setGame((prev) => ({
           ...prev,
-          results: prev.results.map(r =>
-            r.userId === user.userId ? { ...r, rsvpStatus } : r
-          )
+          results: prev.results.map((r) =>
+            r.userId === user.userId
+              ? {
+                  ...r,
+                  rsvpStatus: response.rsvpStatus,
+                  waitlistPosition: response.waitlistPosition || null,
+                  waitlistAddedAt: response.waitlistPosition
+                    ? new Date().toISOString()
+                    : null,
+                }
+              : r
+          ),
         }));
       } else {
         setMessage(`Error: ${response.error || 'Failed to update RSVP'}`);
@@ -72,7 +104,6 @@ const TokenRSVPPage = () => {
       setUpdating(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -90,7 +121,9 @@ const TokenRSVPPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 text-center max-w-md">
           <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Invalid Link</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            Invalid Link
+          </h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => navigate('/')}
@@ -109,28 +142,38 @@ const TokenRSVPPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-lg p-8 text-center">
           <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Game Not Found</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            Game Not Found
+          </h2>
           <p className="text-gray-600">Unable to load game information.</p>
         </div>
       </div>
     );
   }
 
-  const userResult = game.results?.find(r => r.userId === user.userId);
+  const userResult = game.results?.find((r) => r.userId === user.userId);
   const currentRSVP = userResult?.rsvpStatus || 'pending';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-2xl mx-auto py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Game Invitation</h1>
-          <p className="text-gray-600">Hi {user.firstName}, you're invited to poker night!</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            Game Invitation
+          </h1>
+          <p className="text-gray-600">
+            Hi {user.firstName}, you're invited to poker night!
+          </p>
         </div>
 
         {message && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.includes('successfully') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
+          <div
+            className={`mb-6 p-4 rounded-lg ${
+              message.includes('successfully')
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
             {message}
           </div>
         )}
@@ -144,11 +187,16 @@ const TokenRSVPPage = () => {
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                 <div className="flex items-center gap-1">
                   <Users className="w-4 h-4" />
-                  {game.results.length} invited
+                  {game.results.filter((r) => r.rsvpStatus === 'yes').length}
+                  {game.maxPlayers ? `/${game.maxPlayers}` : ''} confirmed
+                  {game.waitlist?.length > 0 && (
+                    <span className="text-orange-600 ml-1">
+                      (+{game.waitlist.length} waitlisted)
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  ${game.buyin || 20} buy-in
+                  <DollarSign className="w-4 h-4" />${game.buyin || 20} buy-in
                 </div>
                 {game.location && (
                   <div className="flex items-center gap-1">
@@ -164,20 +212,33 @@ const TokenRSVPPage = () => {
             {/* Current RSVP Status Display */}
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-sm text-gray-600 mb-2">Your Response:</p>
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-lg ${
-                currentRSVP === 'yes' ? 'bg-green-100 text-green-800 border-2 border-green-300' :
-                currentRSVP === 'no' ? 'bg-red-100 text-red-800 border-2 border-red-300' :
-                'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
-              }`}>
+              <div
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-lg ${
+                  currentRSVP === 'yes'
+                    ? 'bg-green-100 text-green-800 border-2 border-green-300'
+                    : currentRSVP === 'no'
+                      ? 'bg-red-100 text-red-800 border-2 border-red-300'
+                      : currentRSVP === 'waitlisted'
+                        ? 'bg-orange-100 text-orange-800 border-2 border-orange-300'
+                        : 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
+                }`}
+              >
                 {currentRSVP === 'yes' && <CheckCircle className="w-5 h-5" />}
                 {currentRSVP === 'no' && <XCircle className="w-5 h-5" />}
+                {currentRSVP === 'waitlisted' && <Clock className="w-5 h-5" />}
                 {currentRSVP === 'pending' && <Clock className="w-5 h-5" />}
-                {currentRSVP === 'yes' ? 'You\'re Attending!' :
-                 currentRSVP === 'no' ? 'You\'re Not Attending' :
-                 'Response Needed'}
+                {currentRSVP === 'yes'
+                  ? "You're Attending!"
+                  : currentRSVP === 'no'
+                    ? "You're Not Attending"
+                    : currentRSVP === 'waitlisted'
+                      ? `Waitlisted #${userResult?.waitlistPosition}`
+                      : 'Response Needed'}
               </div>
               {currentRSVP !== 'pending' && (
-                <p className="text-xs text-gray-500 mt-2">You can change your response below</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  You can change your response below
+                </p>
               )}
             </div>
 

@@ -1,12 +1,36 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const { verifyAuthHeader } = require('./verifyJWT');
+const { migrateLegacySideBets, validateSideBets } = require('./utils/sideBetUtils');
+const { validatePayoutStructure, cleanPayoutStructure } = require('./utils/payoutUtils');
+
+// Helper function to reprocess waitlist when maxPlayers or waitlistEnabled changes
+function reprocessWaitlist(results, maxPlayers, waitlistEnabled) {
+  if (!waitlistEnabled) return []; // Clear waitlist if disabled
+  if (!maxPlayers) return [];
+
+  const confirmedPlayers = results.filter(r => r.rsvpStatus === 'yes').length;
+  const waitlistedPlayers = results.filter(r => r.rsvpStatus === 'waitlisted');
+
+  // If we're under capacity, no waitlist needed
+  if (confirmedPlayers < maxPlayers) {
+    return [];
+  }
+
+  // Return existing waitlist with updated positions
+  return waitlistedPlayers.map((player, index) => ({
+    userId: player.userId,
+    addedAt: player.waitlistAddedAt || new Date().toISOString(),
+    position: index + 1
+  }));
+}
 
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME;
 const USER_GROUPS_TABLE = process.env.USER_GROUPS_TABLE_NAME;
+const GROUPS_TABLE = process.env.GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
   const headers = {
@@ -91,12 +115,34 @@ exports.handler = async (event) => {
         };
       }
     }
-    
-    // Process results to add rebuys and detect ties
-    const processedResults = gameData.results.map(result => ({
-      ...result,
-      rebuys: result.rebuys || 0 // Default to 0 if not provided
+
+    // Get group data to access side bet configurations
+    const groupResult = await dynamodb.send(new GetCommand({
+      TableName: GROUPS_TABLE,
+      Key: { groupId }
     }));
+
+    if (!groupResult.Item) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Group not found' })
+      };
+    }
+
+    const group = groupResult.Item;
+    const groupSideBets = group.sideBets || [];
+    
+    // Process results to add rebuys, migrate legacy side bets, and detect ties
+    const processedResults = gameData.results.map(result => {
+      const baseResult = {
+        ...result,
+        rebuys: result.rebuys || 0 // Default to 0 if not provided
+      };
+      
+      // Migrate legacy side bet data to new format
+      return migrateLegacySideBets(baseResult, groupSideBets);
+    });
     
     // Auto-detect ties by grouping results with same position
     const positionGroups = {};
@@ -116,12 +162,54 @@ exports.handler = async (event) => {
       }
       return { ...result, tied: false };
     });
+
+    // Validate side bets
+    const sideBetErrors = validateSideBets(resultsWithTies, groupSideBets);
+    if (sideBetErrors.length > 0) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: 'Side bet validation failed',
+          details: sideBetErrors
+        })
+      };
+    }
+
+    // Clean and validate payout structure for tournament games
+    const gameType = gameData.gameType || currentGame.gameType || 'tournament';
+    let cleanedPayoutStructure = gameData.payoutStructure;
+    if (gameType === 'tournament' && gameData.payoutStructure) {
+      cleanedPayoutStructure = cleanPayoutStructure(gameData.payoutStructure);
+      const payoutErrors = validatePayoutStructure(cleanedPayoutStructure);
+      if (payoutErrors.length > 0) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            error: 'Payout structure validation failed',
+            details: payoutErrors
+          })
+        };
+      }
+    }
     
+    // Handle waitlist reprocessing if maxPlayers or waitlistEnabled changed
+    let waitlistToUpdate = currentGame.waitlist || [];
+    const waitlistEnabledChanged = gameData.waitlistEnabled !== undefined && gameData.waitlistEnabled !== currentGame.waitlistEnabled;
+    const maxPlayersChanged = gameData.maxPlayers !== undefined && gameData.maxPlayers !== currentGame.maxPlayers;
+
+    if (waitlistEnabledChanged || maxPlayersChanged) {
+      const newWaitlistEnabled = gameData.waitlistEnabled !== undefined ? gameData.waitlistEnabled : currentGame.waitlistEnabled;
+      const newMaxPlayers = gameData.maxPlayers !== undefined ? gameData.maxPlayers : currentGame.maxPlayers;
+      waitlistToUpdate = reprocessWaitlist(resultsWithTies, newMaxPlayers, newWaitlistEnabled);
+    }
+
     // Update the game (preserve existing gameNumber if not provided)
     const updateParams = {
       TableName: TABLE_NAME,
       Key: { id: gameId },
-      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, #location = :location, updatedAt = :updatedAt, updatedBy = :updatedBy',
+      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, #location = :location, selectedSideBets = :selectedSideBets, maxPlayers = :maxPlayers, waitlistEnabled = :waitlistEnabled, waitlist = :waitlist, gameType = :gameType, minBuyIn = :minBuyIn, maxBuyIn = :maxBuyIn, houseTake = :houseTake, houseTakeType = :houseTakeType, payoutStructure = :payoutStructure, updatedAt = :updatedAt, updatedBy = :updatedBy',
       ExpressionAttributeNames: {
         '#date': 'date', // 'date' is a reserved word in DynamoDB
         '#time': 'time', // 'time' is a reserved word in DynamoDB
@@ -135,6 +223,19 @@ exports.handler = async (event) => {
         ':groupId': groupId,
         ':status': gameData.status || 'completed',
         ':location': gameData.location || null,
+        ':selectedSideBets': gameData.selectedSideBets || [],
+        ':maxPlayers': gameData.maxPlayers,
+        ':waitlistEnabled': gameData.waitlistEnabled !== undefined ? gameData.waitlistEnabled : (currentGame.waitlistEnabled || false),
+        ':waitlist': waitlistToUpdate,
+        ':gameType': gameData.gameType || currentGame.gameType || 'tournament',
+        ':minBuyIn': gameData.minBuyIn !== undefined ? gameData.minBuyIn : (currentGame.minBuyIn || null),
+        ':maxBuyIn': gameData.maxBuyIn !== undefined ? gameData.maxBuyIn : (currentGame.maxBuyIn || null),
+        ':houseTake': gameData.houseTake !== undefined ? gameData.houseTake : (currentGame.houseTake || 0),
+        ':houseTakeType': gameData.houseTakeType || currentGame.houseTakeType || 'fixed',
+        ':payoutStructure': cleanedPayoutStructure || currentGame.payoutStructure || [
+          { position: 1, type: 'percentage', value: 70 },
+          { position: 2, type: 'buyin_return', value: 0 }
+        ],
         ':updatedAt': new Date().toISOString(),
         ':updatedBy': userId
       },

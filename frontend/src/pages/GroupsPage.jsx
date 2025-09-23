@@ -16,6 +16,8 @@ import GroupManagement from '../components/groups/GroupManagement.jsx';
 import LeaderboardSection from '../components/games/LeaderboardSection.jsx';
 import GroupFormModal from '../components/groups/GroupFormModal.jsx';
 import GroupSelector from '../components/groups/GroupSelector.jsx';
+import { SideBetManagement } from '../components/groups/SideBetManagement.jsx';
+import GameTemplateManagement from '../components/groups/GameTemplateManagement.jsx';
 import { GameProvider } from '../context/GameContext.jsx';
 import { isGameScheduled } from '../utils/gameUtils.js';
 import { DEFAULT_VALUES } from '../constants/ui.js';
@@ -36,6 +38,16 @@ const GroupsPage = ({
   sortField,
   sortDirection,
   handleSort,
+  tournamentStandings,
+  tournamentStandingsLoading,
+  tournamentSortField,
+  tournamentSortDirection,
+  handleTournamentSort,
+  cashStandings,
+  cashStandingsLoading,
+  cashSortField,
+  cashSortDirection,
+  handleCashSort,
   expandedRows,
   toggleRowExpanded,
   isMobile,
@@ -48,7 +60,9 @@ const GroupsPage = ({
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [publicGroups, setPublicGroups] = useState([]);
   const [loadingPublicGroups, setLoadingPublicGroups] = useState(false);
+  const [manageTab, setManageTab] = useState('settings'); // 'settings', 'sidebets', or 'templates'
   const [publicGroupsError, setPublicGroupsError] = useState('');
+  const [publicGroupsSuccess, setPublicGroupsSuccess] = useState('');
   const [joiningGroup, setJoiningGroup] = useState(null);
 
   const setActiveTab = (tab) => {
@@ -80,6 +94,7 @@ const GroupsPage = ({
   const loadPublicGroups = async () => {
     setLoadingPublicGroups(true);
     setPublicGroupsError('');
+    setPublicGroupsSuccess('');
 
     try {
       const result = await listPublicGroups(groupSearch);
@@ -99,6 +114,8 @@ const GroupsPage = ({
     if (joiningGroup) return; // Prevent double-clicks
 
     setJoiningGroup(groupId);
+    setPublicGroupsError('');
+    setPublicGroupsSuccess('');
     try {
       const result = await joinGroup(groupId);
       if (result.success) {
@@ -106,24 +123,25 @@ const GroupsPage = ({
         if (onCreateGroup) {
           onCreateGroup(result.group);
         }
+        setPublicGroupsSuccess(`Successfully joined ${result.group.name}!`);
         // Refresh public groups to update join status
         loadPublicGroups();
       } else {
-        alert('Failed to join group: ' + result.error);
+        setPublicGroupsError('Failed to join group: ' + result.error);
       }
     } catch (error) {
-      alert('Failed to join group: ' + error.message);
+      setPublicGroupsError('Failed to join group: ' + error.message);
     } finally {
       setJoiningGroup(null);
     }
   };
 
-  // Load public groups when on join tab
+  // Load public groups when on join tab (without search term to avoid triggering on every input change)
   React.useEffect(() => {
     if (activeTab === 'join') {
       loadPublicGroups();
     }
-  }, [activeTab, groupSearch]);
+  }, [activeTab]);
 
   const tabs = [
     {
@@ -256,15 +274,30 @@ const GroupsPage = ({
               sendingNotifications={false}
               isAuthenticated={!!currentUser}
             >
+              {/* Tournament Leaderboard */}
               <LeaderboardSection
                 isMobile={isMobile}
-                standings={standings}
-                standingsLoading={standingsLoading}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                handleSort={handleSort}
+                standings={tournamentStandings}
+                standingsLoading={tournamentStandingsLoading}
+                sortField={tournamentSortField}
+                sortDirection={tournamentSortDirection}
+                handleSort={handleTournamentSort}
                 expandedRows={expandedRows}
                 toggleRowExpanded={toggleRowExpanded}
+                gameType="tournament"
+              />
+
+              {/* Cash Game Leaderboard */}
+              <LeaderboardSection
+                isMobile={isMobile}
+                standings={cashStandings}
+                standingsLoading={cashStandingsLoading}
+                sortField={cashSortField}
+                sortDirection={cashSortDirection}
+                handleSort={handleCashSort}
+                expandedRows={expandedRows}
+                toggleRowExpanded={toggleRowExpanded}
+                gameType="cash"
               />
             </GameProvider>
           </div>
@@ -321,15 +354,33 @@ const GroupsPage = ({
               </div>
 
               <div className="mb-4">
-                <div className="relative">
-                  <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search public groups..."
-                    value={groupSearch}
-                    onChange={(e) => setGroupSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search public groups..."
+                      value={groupSearch}
+                      onChange={(e) => setGroupSearch(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === 'Enter' && loadPublicGroups()
+                      }
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={loadingPublicGroups}
+                    />
+                  </div>
+                  <button
+                    onClick={loadPublicGroups}
+                    disabled={loadingPublicGroups}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {loadingPublicGroups ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Search
+                  </button>
                 </div>
               </div>
 
@@ -337,6 +388,13 @@ const GroupsPage = ({
               {publicGroupsError && (
                 <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                   {publicGroupsError}
+                </div>
+              )}
+
+              {/* Success Display */}
+              {publicGroupsSuccess && (
+                <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                  {publicGroupsSuccess}
                 </div>
               )}
 
@@ -386,11 +444,88 @@ const GroupsPage = ({
 
         {activeTab === 'manage' &&
           (selectedGroup?.userRole === 'owner' || isAdmin) && (
-            <div>
-              <GroupManagement
-                selectedGroup={selectedGroup}
-                onClose={() => setActiveTab('current')}
-              />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {/* Manage Sub-tabs */}
+              <div className="mb-6">
+                <div className="border-b border-gray-200">
+                  <nav className="-mb-px flex space-x-8">
+                    <button
+                      onClick={() => setManageTab('settings')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        manageTab === 'settings'
+                          ? 'border-blue-500 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Group Settings
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setManageTab('sidebets')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        manageTab === 'sidebets'
+                          ? 'border-blue-500 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        Side Bets
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setManageTab('templates')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        manageTab === 'templates'
+                          ? 'border-blue-500 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Templates
+                      </div>
+                    </button>
+                  </nav>
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              {manageTab === 'settings' && (
+                <GroupManagement
+                  selectedGroup={selectedGroup}
+                  onClose={() => setActiveTab('current')}
+                  onGroupDeleted={(deletedGroupId) => {
+                    // Find another group to select, or show join tab if no groups remain
+                    const remainingGroups = groups.filter(
+                      (g) => g.groupId !== deletedGroupId
+                    );
+                    if (remainingGroups.length > 0) {
+                      // Select the first remaining group
+                      selectGroup(remainingGroups[0]);
+                      setActiveTab('current');
+                    } else {
+                      // No groups remaining, show join tab
+                      setActiveTab('join');
+                    }
+                  }}
+                />
+              )}
+
+              {manageTab === 'sidebets' && (
+                <SideBetManagement
+                  groupId={selectedGroup?.groupId}
+                  groupRole={selectedGroup?.userRole}
+                />
+              )}
+              {manageTab === 'templates' && (
+                <GameTemplateManagement
+                  selectedGroup={selectedGroup}
+                  onClose={() => setActiveTab('current')}
+                />
+              )}
             </div>
           )}
       </div>

@@ -1,13 +1,13 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
 
-const LoadingButton = ({ 
-  loading, 
-  children, 
-  className = '', 
+const LoadingButton = ({
+  loading,
+  children,
+  className = '',
   disabled = false,
   onClick,
-  ...props 
+  ...props
 }) => {
   return (
     <button

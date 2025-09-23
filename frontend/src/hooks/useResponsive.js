@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 const BREAKPOINTS = {
   mobile: 768,
   tablet: 1024,
-  desktop: 1200
+  desktop: 1200,
 };
 
 export const useResponsive = (breakpoint = BREAKPOINTS.mobile) => {
@@ -30,9 +30,16 @@ export const useResponsive = (breakpoint = BREAKPOINTS.mobile) => {
 
   return {
     isMobile,
-    isTablet: !isMobile && (typeof window !== 'undefined' ? window.innerWidth < BREAKPOINTS.tablet : false),
-    isDesktop: typeof window !== 'undefined' ? window.innerWidth >= BREAKPOINTS.desktop : false,
-    screenWidth: typeof window !== 'undefined' ? window.innerWidth : 0
+    isTablet:
+      !isMobile &&
+      (typeof window !== 'undefined'
+        ? window.innerWidth < BREAKPOINTS.tablet
+        : false),
+    isDesktop:
+      typeof window !== 'undefined'
+        ? window.innerWidth >= BREAKPOINTS.desktop
+        : false,
+    screenWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
   };
 };
 

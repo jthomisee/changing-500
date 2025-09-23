@@ -226,7 +226,24 @@ const LoginModal = ({ show, onClose, loading, onSubmit }) => {
                       htmlFor="phoneNotifications"
                       className="ml-2 block text-sm text-gray-900"
                     >
-                      SMS notifications (game invitations & results)
+                      I consent to receive SMS notifications from Changing 500
+                      about game invitations and results. Message and data rates
+                      may apply. Reply STOP to opt out.
+                      <a
+                        href="/terms"
+                        target="_blank"
+                        className="text-blue-600 underline ml-1"
+                      >
+                        Terms
+                      </a>{' '}
+                      |
+                      <a
+                        href="/privacy"
+                        target="_blank"
+                        className="text-blue-600 underline ml-1"
+                      >
+                        Privacy
+                      </a>
                     </label>
                   </div>
                 </div>

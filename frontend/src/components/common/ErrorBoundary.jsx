@@ -14,7 +14,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({
       error: error,
-      errorInfo: errorInfo
+      errorInfo: errorInfo,
     });
 
     // Log error to console in development
@@ -90,7 +90,10 @@ class ErrorBoundary extends React.Component {
 }
 
 // Specialized error boundaries for different sections
-export const GameSectionErrorBoundary = ({ children, sectionName = 'section' }) => (
+export const GameSectionErrorBoundary = ({
+  children,
+  sectionName = 'section',
+}) => (
   <ErrorBoundary
     errorMessage={`There was a problem loading the ${sectionName}. Please try refreshing the page.`}
   >
@@ -130,7 +133,11 @@ export const SimpleErrorFallback = ({ error, resetError }) => (
   </div>
 );
 
-export const InlineErrorFallback = ({ error, resetError, message = 'Error loading content' }) => (
+export const InlineErrorFallback = ({
+  error,
+  resetError,
+  message = 'Error loading content',
+}) => (
   <div className="flex items-center gap-2 text-red-600 text-sm">
     <AlertTriangle className="w-4 h-4" />
     <span>{message}</span>

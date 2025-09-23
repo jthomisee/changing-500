@@ -120,23 +120,6 @@ const HeaderSection = ({
         </div>
       )}
 
-      {/* No Groups Message */}
-      {currentUser && groups.length === 0 && !loadingGroups && (
-        <div className="mt-6 max-w-md mx-auto text-center">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800 mb-4">
-              You're not a member of any groups yet.
-            </p>
-            <button
-              onClick={() => setShowCreateGroup(true)}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
-            >
-              Create Your First Group
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Status indicators */}
       <div className="flex justify-center items-center gap-4 mt-4">
         {gamesError && (

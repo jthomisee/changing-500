@@ -14,7 +14,8 @@ export const useUsers = () => {
 
     setLoading(true);
     try {
-      const users = await searchUsers(query);
+      const result = await searchUsers(query);
+      const users = result.users || result; // Handle both old and new format
       setAvailableUsers(users);
       return users;
     } catch (error) {
@@ -35,6 +36,6 @@ export const useUsers = () => {
     availableUsers,
     loading,
     searchForUsers,
-    clearUsers
+    clearUsers,
   };
 };

@@ -78,6 +78,11 @@ exports.handler = async (event) => {
     const result = await updateGameRSVP(gameId, userId, rsvpStatus);
 
     if (result.success) {
+      let message = `RSVP updated to ${result.finalStatus}`;
+      if (result.waitlistPosition) {
+        message = `You've been added to the waitlist (position #${result.waitlistPosition})`;
+      }
+
       return {
         statusCode: 200,
         headers: {
@@ -86,10 +91,11 @@ exports.handler = async (event) => {
         },
         body: JSON.stringify({
           success: true,
-          message: `RSVP updated to ${rsvpStatus}`,
+          message,
           gameId,
           userId,
-          rsvpStatus
+          rsvpStatus: result.finalStatus,
+          waitlistPosition: result.waitlistPosition
         })
       };
     } else {
@@ -191,26 +197,149 @@ async function updateGameRSVP(gameId, userId, rsvpStatus) {
       return { success: false, error: 'Can only RSVP to scheduled games' };
     }
 
-    // Update the user's RSVP status in the results array
-    const updatedResults = [...game.results];
-    updatedResults[userResultIndex] = {
-      ...updatedResults[userResultIndex],
-      rsvpStatus
-    };
+    // Handle waitlist logic
+    const maxPlayers = game.maxPlayers;
+    const waitlistEnabled = game.waitlistEnabled;
+    const currentResults = [...game.results];
+    const currentWaitlist = game.waitlist || [];
+
+    let updatedResults = [...currentResults];
+    let updatedWaitlist = [...currentWaitlist];
+    let waitlistPosition = null;
+
+    const currentUserResult = updatedResults[userResultIndex];
+
+    if (rsvpStatus === 'yes') {
+      // User wants to confirm attendance
+
+      if (maxPlayers) {
+        // Count confirmed players (excluding current user)
+        const confirmedCount = updatedResults.filter((r, i) =>
+          i !== userResultIndex && r.rsvpStatus === 'yes'
+        ).length;
+
+        if (confirmedCount >= maxPlayers) {
+          if (waitlistEnabled) {
+            // Game is at capacity, add to waitlist
+            rsvpStatus = 'waitlisted';
+
+            // Remove user from existing waitlist if present
+            updatedWaitlist = updatedWaitlist.filter(w => w.userId !== userId);
+
+            // Add to end of waitlist
+            const newWaitlistEntry = {
+              userId,
+              addedAt: new Date().toISOString(),
+              position: updatedWaitlist.length + 1
+            };
+            updatedWaitlist.push(newWaitlistEntry);
+            waitlistPosition = newWaitlistEntry.position;
+
+            // Update user result with waitlist info
+            updatedResults[userResultIndex] = {
+              ...currentUserResult,
+              rsvpStatus: 'waitlisted',
+              waitlistPosition,
+              waitlistAddedAt: newWaitlistEntry.addedAt
+            };
+          } else {
+            // No waitlist enabled, reject the RSVP
+            return { success: false, error: `Game is full (${maxPlayers}/${maxPlayers} players). Waitlist is not enabled for this game.` };
+          }
+        } else {
+          // Space available, confirm the user
+          updatedResults[userResultIndex] = {
+            ...currentUserResult,
+            rsvpStatus: 'yes',
+            waitlistPosition: null,
+            waitlistAddedAt: null
+          };
+
+          // Remove from waitlist if they were on it
+          updatedWaitlist = updatedWaitlist.filter(w => w.userId !== userId);
+        }
+      } else {
+        // No max players limit, always confirm
+        updatedResults[userResultIndex] = {
+          ...currentUserResult,
+          rsvpStatus: 'yes',
+          waitlistPosition: null,
+          waitlistAddedAt: null
+        };
+      }
+
+    } else if (rsvpStatus === 'no') {
+      // User declining or withdrawing
+
+      updatedResults[userResultIndex] = {
+        ...currentUserResult,
+        rsvpStatus: 'no',
+        waitlistPosition: null,
+        waitlistAddedAt: null
+      };
+
+      // Remove from waitlist
+      updatedWaitlist = updatedWaitlist.filter(w => w.userId !== userId);
+
+      // If user was confirmed and there's a waitlist and waitlist is enabled, promote next person
+      if (waitlistEnabled && currentUserResult.rsvpStatus === 'yes' && updatedWaitlist.length > 0) {
+        const nextUser = updatedWaitlist[0];
+
+        // Find the next user in results and promote them
+        const nextUserIndex = updatedResults.findIndex(r => r.userId === nextUser.userId);
+        if (nextUserIndex !== -1) {
+          updatedResults[nextUserIndex] = {
+            ...updatedResults[nextUserIndex],
+            rsvpStatus: 'yes',
+            waitlistPosition: null,
+            waitlistAddedAt: null
+          };
+
+          // Remove promoted user from waitlist
+          updatedWaitlist = updatedWaitlist.slice(1);
+
+          // TODO: Send promotion notification to promoted user
+        }
+      }
+
+      // Update waitlist positions
+      updatedWaitlist = updatedWaitlist.map((entry, index) => ({
+        ...entry,
+        position: index + 1
+      }));
+
+    } else if (rsvpStatus === 'pending') {
+      // Reset to pending
+      updatedResults[userResultIndex] = {
+        ...currentUserResult,
+        rsvpStatus: 'pending',
+        waitlistPosition: null,
+        waitlistAddedAt: null
+      };
+
+      // Remove from waitlist
+      updatedWaitlist = updatedWaitlist.filter(w => w.userId !== userId);
+    }
 
     // Update the game in DynamoDB
     await dynamodb.send(new UpdateCommand({
       TableName: GAMES_TABLE,
       Key: { id: gameId },
-      UpdateExpression: 'SET results = :results, updatedAt = :updatedAt',
+      UpdateExpression: 'SET results = :results, waitlist = :waitlist, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':results': updatedResults,
+        ':waitlist': updatedWaitlist,
         ':updatedAt': new Date().toISOString()
       }
     }));
 
-    console.log(`RSVP updated: ${userId} -> ${rsvpStatus} for game ${gameId}`);
-    return { success: true };
+    console.log(`RSVP updated: ${userId} -> ${rsvpStatus} for game ${gameId}${waitlistPosition ? ` (waitlist position: ${waitlistPosition})` : ''}`);
+
+    return {
+      success: true,
+      waitlistPosition,
+      finalStatus: updatedResults[userResultIndex].rsvpStatus
+    };
 
   } catch (error) {
     console.error('Error updating RSVP:', error);

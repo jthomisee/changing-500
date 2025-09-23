@@ -2,12 +2,15 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const { v4: uuidv4 } = require('uuid');
 const { verifyAuthHeader } = require('./verifyJWT');
+const { migrateLegacySideBets, validateSideBets } = require('./utils/sideBetUtils');
+const { validatePayoutStructure, cleanPayoutStructure } = require('./utils/payoutUtils');
 
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
 
-const TABLE_NAME = process.env.TABLE_NAME;
+const TABLE_NAME = process.env.GAMES_TABLE_NAME;
 const USER_GROUPS_TABLE = process.env.USER_GROUPS_TABLE_NAME;
+const GROUPS_TABLE = process.env.GROUPS_TABLE_NAME;
 
 exports.handler = async (event) => {
   const headers = {
@@ -69,12 +72,34 @@ exports.handler = async (event) => {
         };
       }
     }
-    
-    // Process results to add rebuys and detect ties
-    const processedResults = gameData.results.map(result => ({
-      ...result,
-      rebuys: result.rebuys || 0 // Default to 0 if not provided
+
+    // Get group data to access side bet configurations
+    const groupResult = await dynamodb.send(new GetCommand({
+      TableName: GROUPS_TABLE,
+      Key: { groupId: gameData.groupId }
     }));
+
+    if (!groupResult.Item) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Group not found' })
+      };
+    }
+
+    const group = groupResult.Item;
+    const groupSideBets = group.sideBets || [];
+    
+    // Process results to add rebuys, migrate legacy side bets, and detect ties
+    const processedResults = gameData.results.map(result => {
+      const baseResult = {
+        ...result,
+        rebuys: result.rebuys || 0 // Default to 0 if not provided
+      };
+      
+      // Migrate legacy side bet data to new format
+      return migrateLegacySideBets(baseResult, groupSideBets);
+    });
     
     // Auto-detect ties by grouping results with same position
     const positionGroups = {};
@@ -94,6 +119,36 @@ exports.handler = async (event) => {
       }
       return { ...result, tied: false };
     });
+
+    // Validate side bets
+    const sideBetErrors = validateSideBets(resultsWithTies, groupSideBets);
+    if (sideBetErrors.length > 0) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: 'Side bet validation failed',
+          details: sideBetErrors
+        })
+      };
+    }
+
+    // Clean and validate payout structure for tournament games
+    let cleanedPayoutStructure = gameData.payoutStructure;
+    if (gameData.gameType === 'tournament' && gameData.payoutStructure) {
+      cleanedPayoutStructure = cleanPayoutStructure(gameData.payoutStructure);
+      const payoutErrors = validatePayoutStructure(cleanedPayoutStructure);
+      if (payoutErrors.length > 0) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            error: 'Payout structure validation failed',
+            details: payoutErrors
+          })
+        };
+      }
+    }
     
     // Generate unique ID
     const id = `game_${gameData.date.replace(/-/g, '')}_${uuidv4().substring(0, 8)}`;
@@ -104,7 +159,28 @@ exports.handler = async (event) => {
       id,
       time: gameData.time || null,
       status: gameData.status || 'completed',
-      createdAt: gameData.createdAt || new Date().toISOString()
+      createdAt: gameData.createdAt || new Date().toISOString(),
+      selectedSideBets: gameData.selectedSideBets || [], // Track which side bets were selected for this game
+      maxPlayers: gameData.maxPlayers, // Maximum number of players allowed (required field)
+      waitlistEnabled: gameData.waitlistEnabled || false, // Whether waitlist is enabled
+      waitlist: [], // Initialize empty waitlist
+
+      // Game type and configuration
+      gameType: gameData.gameType || 'tournament', // 'cash' or 'tournament'
+
+      // Cash game settings
+      minBuyIn: gameData.minBuyIn || null,
+      maxBuyIn: gameData.maxBuyIn || null,
+
+      // House take configuration
+      houseTake: gameData.houseTake || 0,
+      houseTakeType: gameData.houseTakeType || 'fixed', // 'fixed' or 'percentage'
+
+      // Tournament payout structure
+      payoutStructure: cleanedPayoutStructure || [
+        { position: 1, type: 'percentage', value: 70 },
+        { position: 2, type: 'buyin_return', value: 0 }
+      ]
     };
 
     const params = {

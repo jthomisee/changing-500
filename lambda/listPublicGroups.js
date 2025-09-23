@@ -49,7 +49,7 @@ exports.handler = async (event) => {
     // Get query parameters
     const queryParams = event.queryStringParameters || {};
     const searchTerm = queryParams.search?.trim().toLowerCase() || '';
-    const limit = Math.min(parseInt(queryParams.limit) || 20, 100); // Max 100 items
+    const limit = Math.min(parseInt(queryParams.limit) || 10, 100); // Default 10, max 100 items
     const lastEvaluatedKey = queryParams.lastKey ? JSON.parse(decodeURIComponent(queryParams.lastKey)) : undefined;
 
     // Query public groups using GSI
@@ -61,19 +61,9 @@ exports.handler = async (event) => {
         ':isPublic': 'true'
       },
       ScanIndexForward: false, // Most recent first
-      Limit: limit,
+      Limit: searchTerm ? 100 : limit, // Get more items if filtering to account for filtered-out results
       ExclusiveStartKey: lastEvaluatedKey
     };
-
-    // Add filter for search term if provided
-    if (searchTerm) {
-      queryCommand.FilterExpression = 'contains(#name, :searchTerm) OR contains(#description, :searchTerm)';
-      queryCommand.ExpressionAttributeNames = {
-        '#name': 'name',
-        '#description': 'description'
-      };
-      queryCommand.ExpressionAttributeValues[':searchTerm'] = searchTerm;
-    }
 
     const result = await dynamodb.send(new QueryCommand(queryCommand));
 
@@ -89,14 +79,26 @@ exports.handler = async (event) => {
     const userGroupsResult = await dynamodb.send(new QueryCommand(userGroupsQuery));
     const userGroupIds = new Set(userGroupsResult.Items?.map(item => item.groupId) || []);
 
-    // Enhance groups with user membership status
-    const groups = result.Items?.map(group => ({
+    // Enhance groups with user membership status and apply case-insensitive filtering
+    let groups = result.Items?.map(group => ({
       ...group,
       isPublic: group.isPublic === 'true', // Convert string back to boolean
       isJoined: userGroupIds.has(group.groupId),
       // Remove sensitive information
       createdBy: undefined
     })) || [];
+
+    // Apply case-insensitive search filtering if search term provided
+    if (searchTerm) {
+      groups = groups.filter(group => {
+        const name = (group.name || '').toLowerCase();
+        const description = (group.description || '').toLowerCase();
+        return name.includes(searchTerm) || description.includes(searchTerm);
+      });
+
+      // Limit results after filtering
+      groups = groups.slice(0, limit);
+    }
 
     // Prepare pagination info
     const pagination = {

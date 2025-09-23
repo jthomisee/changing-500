@@ -46,7 +46,7 @@ exports.handler = async (event) => {
     }
 
     // Get query parameters for pagination and search
-    const { limit = '50', lastEvaluatedKey, search } = event.queryStringParameters || {};
+    const { limit = '10', lastEvaluatedKey, search } = event.queryStringParameters || {};
 
     let scanParams = {
       TableName: USERS_TABLE
@@ -199,7 +199,8 @@ exports.handler = async (event) => {
     const response = {
       users,
       count: users.length,
-      totalScanned: result.ScannedCount || 0
+      totalScanned: result.ScannedCount || 0,
+      hasMore: !!result.LastEvaluatedKey
     };
 
     // Add pagination info if there are more results

@@ -9,35 +9,52 @@ export const useGroups = () => {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [groupError, setGroupError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasMoreGroups, setHasMoreGroups] = useState(false);
+  const [groupsLastKey, setGroupsLastKey] = useState(null);
 
-  const loadGroups = useCallback(async () => {
-    if (!isAuthenticated || !currentUser) {
-      setGroups([]);
-      setSelectedGroup(null);
-      setIsAdmin(false);
-      return;
-    }
+  const loadGroups = useCallback(
+    async (limit = 10, append = false) => {
+      if (!isAuthenticated || !currentUser) {
+        setGroups([]);
+        setSelectedGroup(null);
+        setIsAdmin(false);
+        return;
+      }
 
-    setLoadingGroups(true);
-    setGroupError('');
-    try {
-      const result = await listGroups();
-      if (result.success) {
-        setGroups(result.groups);
-        setIsAdmin(result.isAdmin || false);
-      } else {
-        setGroupError(result.error);
+      setLoadingGroups(true);
+      setGroupError('');
+      try {
+        const result = await listGroups(limit, append ? groupsLastKey : null);
+        if (result.success) {
+          if (append) {
+            setGroups((prev) => [...prev, ...result.groups]);
+          } else {
+            setGroups(result.groups);
+          }
+          setIsAdmin(result.isAdmin || false);
+          setHasMoreGroups(result.hasMore);
+          setGroupsLastKey(result.lastEvaluatedKey);
+        } else {
+          setGroupError(result.error);
+          setIsAdmin(false);
+          setGroups([]);
+        }
+      } catch (err) {
+        setGroupError('Failed to load groups');
         setIsAdmin(false);
         setGroups([]);
+      } finally {
+        setLoadingGroups(false);
       }
-    } catch (err) {
-      setGroupError('Failed to load groups');
-      setIsAdmin(false);
-      setGroups([]);
-    } finally {
-      setLoadingGroups(false);
+    },
+    [isAuthenticated, currentUser, groupsLastKey]
+  );
+
+  const loadMoreGroups = useCallback(async () => {
+    if (hasMoreGroups && !loadingGroups) {
+      await loadGroups(50, true);
     }
-  }, [isAuthenticated, currentUser]);
+  }, [hasMoreGroups, loadingGroups, loadGroups]);
 
   const selectGroup = (group) => {
     setSelectedGroup(group);
@@ -116,7 +133,9 @@ export const useGroups = () => {
     loadingGroups,
     groupError,
     isAdmin,
+    hasMoreGroups,
     loadGroups,
+    loadMoreGroups,
     selectGroup,
     createNewGroup,
   };

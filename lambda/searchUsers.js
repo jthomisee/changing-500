@@ -40,7 +40,9 @@ exports.handler = async (event) => {
         };
       }
 
-      const query = event.queryStringParameters?.q || '';
+      const query = event.queryStringParameters?.search || '';
+      const limit = Math.min(parseInt(event.queryStringParameters?.limit) || 10, 50); // Default 10, max 50
+      const lastEvaluatedKey = event.queryStringParameters?.lastEvaluatedKey;
       const normalizedPhone = query.replace(/\D/g, ''); // Remove non-digits for phone search
       
       let filterExpression = 'contains(#firstName, :query) OR contains(#lastName, :query)';
@@ -75,8 +77,17 @@ exports.handler = async (event) => {
         FilterExpression: filterExpression,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
-        Limit: 20 // Limit results for performance
+        Limit: limit
       };
+
+      // Add pagination if provided
+      if (lastEvaluatedKey) {
+        try {
+          scanParams.ExclusiveStartKey = JSON.parse(decodeURIComponent(lastEvaluatedKey));
+        } catch (e) {
+          console.error('Invalid lastEvaluatedKey:', e);
+        }
+      }
 
       const result = await dynamodb.send(new ScanCommand(scanParams));
       
@@ -94,7 +105,9 @@ exports.handler = async (event) => {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-          users: users
+          users: users,
+          hasMore: !!result.LastEvaluatedKey,
+          lastEvaluatedKey: result.LastEvaluatedKey ? encodeURIComponent(JSON.stringify(result.LastEvaluatedKey)) : null
         })
       };
 

@@ -1,8 +1,13 @@
 import { apiCall } from './api.js';
 
-export const listGroups = async () => {
+export const listGroups = async (limit = 10, lastEvaluatedKey = null) => {
   try {
-    const data = await apiCall('/groups', {
+    let queryParams = `?limit=${limit}`;
+    if (lastEvaluatedKey) {
+      queryParams += `&lastEvaluatedKey=${encodeURIComponent(lastEvaluatedKey)}`;
+    }
+
+    const data = await apiCall(`/groups${queryParams}`, {
       method: 'GET',
     });
 
@@ -11,6 +16,8 @@ export const listGroups = async () => {
       groups: data.groups,
       count: data.count,
       isAdmin: data.isAdmin || false,
+      hasMore: data.hasMore || false,
+      lastEvaluatedKey: data.lastEvaluatedKey,
     };
   } catch (error) {
     console.error('Failed to load user groups:', error);
@@ -47,7 +54,7 @@ export const joinGroup = async (groupId) => {
 
 export const listPublicGroups = async (
   searchTerm = '',
-  limit = 20,
+  limit = 10,
   lastKey = null
 ) => {
   try {
@@ -141,6 +148,19 @@ export const updateGroup = async (groupId, groupData) => {
     return { success: true, group: data.group };
   } catch (error) {
     console.error('Failed to update group:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteGroup = async (groupId) => {
+  try {
+    const data = await apiCall(`/groups/${groupId}`, {
+      method: 'DELETE',
+    });
+
+    return { success: true, message: data.message };
+  } catch (error) {
+    console.error('Failed to delete group:', error);
     return { success: false, error: error.message };
   }
 };

@@ -15,7 +15,7 @@ export const useGroupUsers = (groupId) => {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await listGroupUsers(groupId);
       if (result.success) {
@@ -43,7 +43,7 @@ export const useGroupUsers = (groupId) => {
       const result = await createGroupUser(groupId, userData);
       if (result.success) {
         // Add the new user to the local list and sort it properly
-        setGroupUsers(prevUsers => {
+        setGroupUsers((prevUsers) => {
           const updatedUsers = [...prevUsers, result.user];
           // Sort alphabetically
           return updatedUsers.sort((a, b) => {
@@ -58,9 +58,9 @@ export const useGroupUsers = (groupId) => {
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      return { 
-        success: false, 
-        error: error.message 
+      return {
+        success: false,
+        error: error.message,
       };
     }
   };
@@ -75,6 +75,6 @@ export const useGroupUsers = (groupId) => {
     loading,
     error,
     loadGroupUsers,
-    addGroupUser
+    addGroupUser,
   };
 };

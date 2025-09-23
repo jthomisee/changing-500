@@ -1,24 +1,28 @@
 import React from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
-const SortableHeader = ({ 
-  field, 
-  children, 
-  align = "text-left", 
+const SortableHeader = ({
+  field,
+  children,
+  align = 'text-left',
   sticky = false,
-  stickyLeft = "left-0",
+  stickyLeft = 'left-0',
   sortField,
   sortDirection,
-  onSort 
+  onSort,
 }) => {
   const getSortIcon = () => {
     if (sortField !== field) return <ChevronsUpDown className="w-4 h-4" />;
-    return sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+    return sortDirection === 'asc' ? (
+      <ChevronUp className="w-4 h-4" />
+    ) : (
+      <ChevronDown className="w-4 h-4" />
+    );
   };
 
-  const stickyClasses = sticky 
-    ? `sticky ${stickyLeft} bg-white z-10 shadow-sm border-r border-gray-200` 
-    : "";
+  const stickyClasses = sticky
+    ? `sticky ${stickyLeft} bg-white z-10 shadow-sm border-r border-gray-200`
+    : '';
 
   const getFlexAlignment = () => {
     if (align.includes('text-center')) return 'justify-center';

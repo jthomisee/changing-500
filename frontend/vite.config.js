@@ -7,7 +7,7 @@ export default defineConfig({
       include: [/\.jsx?$/, /\.tsx?$/],
       // Enable fast refresh for better DX
       fastRefresh: true,
-    })
+    }),
   ],
   server: {
     port: 3000,
@@ -16,7 +16,7 @@ export default defineConfig({
   },
   preview: {
     port: 3000,
-    open: true
+    open: true,
   },
   build: {
     // Generate source maps for better debugging
@@ -27,14 +27,20 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           ui: ['lucide-react'],
-          utils: ['dayjs']
-        }
-      }
-    }
+          utils: ['dayjs'],
+        },
+      },
+    },
   },
   optimizeDeps: {
     // Pre-bundle these dependencies for faster dev startup
-    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react', 'dayjs']
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'lucide-react',
+      'dayjs',
+    ],
   },
   test: {
     globals: true,
@@ -43,7 +49,7 @@ export default defineConfig({
     // Better test coverage reports
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html']
-    }
-  }
+      reporter: ['text', 'json', 'html'],
+    },
+  },
 });

@@ -57,8 +57,9 @@ resource "aws_lambda_function" "create_game" {
 
   environment {
     variables = {
-      TABLE_NAME             = aws_dynamodb_table.games_table.name
+      GAMES_TABLE_NAME       = aws_dynamodb_table.games_table.name
       USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
     }
   }
 
@@ -79,6 +80,7 @@ resource "aws_lambda_function" "update_game" {
     variables = {
       TABLE_NAME             = aws_dynamodb_table.games_table.name
       USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
     }
   }
 
@@ -440,6 +442,67 @@ resource "aws_lambda_function" "update_group" {
   tags = local.common_tags
 }
 
+# Manage Group Side Bets Lambda Function
+resource "aws_lambda_function" "manage_group_side_bets" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-manage-group-side-bets-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "manageGroupSideBets.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Delete Group Lambda Function
+resource "aws_lambda_function" "delete_group" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-delete-group-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "deleteGroup.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+      TABLE_NAME             = aws_dynamodb_table.games_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# Manage Game Templates Lambda Function
+resource "aws_lambda_function" "manage_game_templates" {
+  filename         = "lambda.zip"
+  function_name    = "${var.project_name}-manage-game-templates-${var.environment}"
+  role            = aws_iam_role.lambda_execution_role.arn
+  handler         = "manageGameTemplates.handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime         = "nodejs22.x"
+  timeout         = 30
+
+  environment {
+    variables = {
+      GROUPS_TABLE_NAME      = aws_dynamodb_table.groups_table.name
+      USER_GROUPS_TABLE_NAME = aws_dynamodb_table.user_groups_table.name
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # Lambda permissions for API Gateway to invoke functions
 resource "aws_lambda_permission" "api_gateway_get_games" {
   statement_id  = "AllowExecutionFromAPIGateway"
@@ -562,7 +625,7 @@ resource "aws_lambda_permission" "api_gateway_create_group" {
 }
 
 resource "aws_lambda_permission" "api_gateway_join_group" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+  statement_id  = "AllowExecutionFromAPIGatewayJoinGroup"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.join_group.function_name
   principal     = "apigateway.amazonaws.com"
@@ -647,6 +710,30 @@ resource "aws_lambda_permission" "api_gateway_update_group" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.update_group.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_manage_group_side_bets" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.manage_group_side_bets.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_delete_group" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.delete_group.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_manage_game_templates" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.manage_game_templates.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.changing_500_api.execution_arn}/*/*"
 }

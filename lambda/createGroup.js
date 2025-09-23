@@ -96,7 +96,8 @@ exports.handler = async (event) => {
       updatedAt: now,
       createdBy: userId,
       memberCount: 1, // Creator is automatically a member
-      gameCount: 0
+      gameCount: 0,
+      sideBets: [] // Initialize empty side bets array
     };
 
     // Create the group

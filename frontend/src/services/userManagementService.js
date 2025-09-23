@@ -1,18 +1,32 @@
 import { apiCall } from './api';
 
 // Admin-only user management functions
-export const listAllUsers = async (searchTerm = '', limit = 50) => {
+export const listAllUsers = async (
+  searchTerm = '',
+  limit = 10,
+  lastEvaluatedKey = null
+) => {
   try {
     let queryParams = `?limit=${limit}`;
     if (searchTerm) {
       queryParams += `&search=${encodeURIComponent(searchTerm)}`;
+    }
+    if (lastEvaluatedKey) {
+      queryParams += `&lastEvaluatedKey=${encodeURIComponent(lastEvaluatedKey)}`;
     }
 
     const data = await apiCall(`/users/manage${queryParams}`, {
       method: 'GET',
     });
 
-    return { success: true, users: data.users, count: data.count };
+    return {
+      success: true,
+      users: data.users,
+      count: data.count,
+      totalScanned: data.totalScanned,
+      lastEvaluatedKey: data.lastEvaluatedKey,
+      hasMore: !!data.lastEvaluatedKey,
+    };
   } catch (error) {
     console.error('Failed to load users:', error);
     return { success: false, error: error.message };

@@ -1,4 +1,4 @@
-import { calculatePoints } from './gameUtils';
+import { calculatePoints, calculateSideBetWinnings } from './gameUtils';
 import { BEST_HAND_BET_AMOUNT } from '../constants/config';
 
 /**
@@ -11,7 +11,8 @@ import { BEST_HAND_BET_AMOUNT } from '../constants/config';
 export const getUserGamesAcrossGroups = (
   allGames,
   currentUser,
-  groups = []
+  groups = [],
+  groupSideBetsMap = {}
 ) => {
   if (!currentUser?.userId || !allGames?.length) {
     return [];
@@ -35,14 +36,43 @@ export const getUserGamesAcrossGroups = (
       // Get group information
       const group = groupMap[game.groupId];
 
+      // Calculate side bet winnings
+      const groupSideBets = groupSideBetsMap[game.groupId] || [];
+      const sideBetWinnings = calculateSideBetWinnings(
+        userResult,
+        game.results,
+        groupSideBets
+      );
+
+      // Calculate cash game specific values
+      let userProfitLoss = 0;
+      let actualWinnings = userResult.winnings || 0;
+      let totalCost =
+        (game.buyin || 20) + (userResult.rebuys || 0) * (game.buyin || 20);
+
+      if (game.gameType === 'cash') {
+        // For cash games, profit/loss is cash-out minus buy-in (no rebuys)
+        const cashOut = userResult.cashOutAmount || 0;
+        const buyIn = userResult.buyInAmount || 0;
+        totalCost = buyIn;
+        actualWinnings = cashOut;
+        userProfitLoss = cashOut - totalCost + sideBetWinnings;
+      } else {
+        // For tournament games, use existing logic
+        userProfitLoss = actualWinnings - totalCost + sideBetWinnings;
+      }
+
       userGames.push({
         ...game,
         groupName: group?.name || 'Unknown Group',
         userResult,
         userPosition: userResult.position,
-        userWinnings: userResult.winnings,
+        userWinnings: actualWinnings, // Winnings should only be prize money, not side bets
+        userSideBetWinnings: sideBetWinnings,
         userRebuys: userResult.rebuys,
-        userPoints: calculatePoints(game.results, userResult),
+        userProfitLoss, // P&L includes side bet winnings
+        userTotalCost: totalCost,
+        userPoints: calculatePoints(game.results, userResult, game.gameType),
         userBestHandParticipant: userResult.bestHandParticipant || false,
         userBestHandWinner: userResult.bestHandWinner || false,
         buyin: game.buyin || 20, // Default buyin if not specified
@@ -92,14 +122,26 @@ export const calculateUserCombinedStats = (userGames, currentUser) => {
   userGames.forEach((game) => {
     const { userResult, buyin } = game;
 
-    // Basic stats
-    stats.totalWinnings += userResult.winnings;
-    stats.totalBuyins += buyin + userResult.rebuys * buyin;
-    stats.totalPositions += userResult.position;
+    // Use pre-calculated values from getUserGamesAcrossGroups
+    stats.totalWinnings += game.userWinnings || 0;
+    stats.totalBuyins += game.userTotalCost || 0;
 
-    // Count wins (1st or 2nd place)
-    if (userResult.position === 1 || userResult.position === 2) {
-      stats.wins++;
+    // Only count positions for tournament games
+    if (game.gameType !== 'cash' && userResult.position) {
+      stats.totalPositions += userResult.position;
+    }
+
+    // Count wins differently for cash vs tournament games
+    if (game.gameType === 'cash') {
+      // For cash games, consider it a "win" if profit is positive
+      if (game.userProfitLoss > 0) {
+        stats.wins++;
+      }
+    } else {
+      // For tournament games, count 1st or 2nd place as wins
+      if (userResult.position === 1 || userResult.position === 2) {
+        stats.wins++;
+      }
     }
 
     // Best hand tracking
@@ -126,8 +168,14 @@ export const calculateUserCombinedStats = (userGames, currentUser) => {
 
   // Calculate derived stats
   const winRate = stats.numGames > 0 ? (stats.wins / stats.numGames) * 100 : 0;
+
+  // Only calculate average position for tournament games
+  const tournamentGames = userGames.filter((game) => game.gameType !== 'cash');
   const avgPosition =
-    stats.numGames > 0 ? stats.totalPositions / stats.numGames : 0;
+    tournamentGames.length > 0
+      ? stats.totalPositions / tournamentGames.length
+      : 0;
+
   const totalCosts = stats.totalBuyins + stats.bestHandCosts;
   const totalEarnings = stats.totalWinnings + stats.bestHandWinnings;
   const profitLoss = totalEarnings - totalCosts;

@@ -1,20 +1,50 @@
 import { apiCall } from './api';
 
 // Game API calls
-export const loadGames = async () => {
+export const loadGames = async (
+  limit = 10,
+  lastEvaluatedKey = null,
+  groupId = null
+) => {
   try {
-    const response = await apiCall('/games');
-    return response.games || [];
+    let queryParams = `?limit=${limit}`;
+    if (lastEvaluatedKey) {
+      queryParams += `&lastEvaluatedKey=${encodeURIComponent(lastEvaluatedKey)}`;
+    }
+    if (groupId) {
+      queryParams += `&groupId=${groupId}`;
+    }
+
+    const response = await apiCall(`/games${queryParams}`);
+    return {
+      games: response.games || [],
+      count: response.count || 0,
+      hasMore: response.hasMore || false,
+      lastEvaluatedKey: response.lastEvaluatedKey,
+    };
   } catch (error) {
     console.error('Failed to load games:', error);
     throw error;
   }
 };
 
-export const loadScheduledGames = async () => {
+export const loadScheduledGames = async (
+  limit = 10,
+  lastEvaluatedKey = null
+) => {
   try {
-    const response = await apiCall('/games?status=scheduled');
-    return response.games || [];
+    let queryParams = `?status=scheduled&limit=${limit}`;
+    if (lastEvaluatedKey) {
+      queryParams += `&lastEvaluatedKey=${encodeURIComponent(lastEvaluatedKey)}`;
+    }
+
+    const response = await apiCall(`/games${queryParams}`);
+    return {
+      games: response.games || [],
+      count: response.count || 0,
+      hasMore: response.hasMore || false,
+      lastEvaluatedKey: response.lastEvaluatedKey,
+    };
   } catch (error) {
     console.error('Failed to load scheduled games:', error);
     throw error;

@@ -24,7 +24,7 @@ export const formatGameDateTime = (game, userTimezone = 'America/New_York') => {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
       };
 
       return new Intl.DateTimeFormat('en-US', options).format(utcDateTime);
@@ -37,7 +37,7 @@ export const formatGameDateTime = (game, userTimezone = 'America/New_York') => {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     };
 
     return new Intl.DateTimeFormat('en-US', options).format(date);
@@ -61,7 +61,7 @@ export const formatDate = (dateString, userTimezone = 'America/New_York') => {
       timeZone: userTimezone,
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     };
 
     return new Intl.DateTimeFormat('en-US', options).format(date);
@@ -71,7 +71,10 @@ export const formatDate = (dateString, userTimezone = 'America/New_York') => {
   }
 };
 
-export const formatDateTime = (dateString, userTimezone = 'America/New_York') => {
+export const formatDateTime = (
+  dateString,
+  userTimezone = 'America/New_York'
+) => {
   if (!dateString) return 'N/A';
 
   try {
@@ -83,7 +86,7 @@ export const formatDateTime = (dateString, userTimezone = 'America/New_York') =>
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     };
 
     return new Intl.DateTimeFormat('en-US', options).format(date);
@@ -105,7 +108,7 @@ export const convertToUTC = (date, time, userTimezone = 'America/New_York') => {
 
       return {
         date: utcDateTime.format('YYYY-MM-DD'),
-        time: utcDateTime.format('HH:mm')
+        time: utcDateTime.format('HH:mm'),
       };
     } catch (error) {
       console.error('Error converting to UTC with Day.js:', error);
@@ -113,7 +116,7 @@ export const convertToUTC = (date, time, userTimezone = 'America/New_York') => {
       const localDateTime = new Date(`${date}T${time}`);
       return {
         date: localDateTime.toISOString().split('T')[0],
-        time: localDateTime.toISOString().split('T')[1].substring(0, 5)
+        time: localDateTime.toISOString().split('T')[1].substring(0, 5),
       };
     }
   }
@@ -122,7 +125,11 @@ export const convertToUTC = (date, time, userTimezone = 'America/New_York') => {
 };
 
 // Helper function to convert UTC datetime from database to local time for display
-export const convertFromUTC = (utcDate, utcTime, userTimezone = 'America/New_York') => {
+export const convertFromUTC = (
+  utcDate,
+  utcTime,
+  userTimezone = 'America/New_York'
+) => {
   if (!utcDate) return { date: '', time: '' };
 
   if (utcTime) {
@@ -133,7 +140,7 @@ export const convertFromUTC = (utcDate, utcTime, userTimezone = 'America/New_Yor
 
       return {
         date: userDateTime.format('YYYY-MM-DD'),
-        time: userDateTime.format('HH:mm')
+        time: userDateTime.format('HH:mm'),
       };
     } catch (error) {
       console.error('Error converting from UTC with Day.js:', error);
@@ -143,7 +150,7 @@ export const convertFromUTC = (utcDate, utcTime, userTimezone = 'America/New_Yor
       const localTime = utcDateTime.toLocaleTimeString('en-GB', {
         hour12: false,
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       }); // HH:MM format
       return { date: localDate, time: localTime };
     }
@@ -156,9 +163,9 @@ export const convertFromUTC = (utcDate, utcTime, userTimezone = 'America/New_Yor
 export const isGameInFuture = (gameDate, gameTime) => {
   if (!gameDate) return false;
 
-  const gameDateTime = gameTime ?
-    new Date(`${gameDate}T${gameTime}:00.000Z`) : // Treat stored time as UTC
-    new Date(`${gameDate}T00:00:00.000Z`);
+  const gameDateTime = gameTime
+    ? new Date(`${gameDate}T${gameTime}:00.000Z`) // Treat stored time as UTC
+    : new Date(`${gameDate}T00:00:00.000Z`);
 
   return gameDateTime > new Date();
 };

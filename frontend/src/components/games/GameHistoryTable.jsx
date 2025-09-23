@@ -4,7 +4,7 @@ import { formatCurrency, getProfitLossColor } from '../../utils/userStatsUtils';
 import SortableHeader from '../common/SortableHeader.jsx';
 import EmptyState from '../common/EmptyState.jsx';
 
-const GameHistoryTable = ({ userGames = [], loading = false }) => {
+const GameHistoryTable = ({ userGames = [], loading = false, onGameClick }) => {
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
 
@@ -33,12 +33,18 @@ const GameHistoryTable = ({ userGames = [], loading = false }) => {
           bValue = b.userWinnings;
           break;
         case 'buyin':
-          aValue = a.buyin + a.userRebuys * a.buyin;
-          bValue = b.buyin + b.userRebuys * b.buyin;
+          aValue = a.userTotalCost || a.buyin + a.userRebuys * a.buyin;
+          bValue = b.userTotalCost || b.buyin + b.userRebuys * b.buyin;
           break;
         case 'profit':
-          aValue = a.userWinnings - (a.buyin + a.userRebuys * a.buyin);
-          bValue = b.userWinnings - (b.buyin + b.userRebuys * b.buyin);
+          aValue =
+            a.userProfitLoss !== undefined
+              ? a.userProfitLoss
+              : a.userWinnings - (a.buyin + a.userRebuys * a.buyin);
+          bValue =
+            b.userProfitLoss !== undefined
+              ? b.userProfitLoss
+              : b.userWinnings - (b.buyin + b.userRebuys * b.buyin);
           break;
         default:
           aValue = a[sortField];
@@ -156,13 +162,18 @@ const GameHistoryTable = ({ userGames = [], loading = false }) => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedGames.map((game) => {
-              const totalCost = game.buyin + game.userRebuys * game.buyin;
-              const profit = game.userWinnings - totalCost;
+              const totalCost =
+                game.userTotalCost || game.buyin + game.userRebuys * game.buyin;
+              const profit =
+                game.userProfitLoss !== undefined
+                  ? game.userProfitLoss
+                  : game.userWinnings - totalCost;
 
               return (
                 <tr
                   key={`${game.id}-${game.groupId}`}
-                  className="hover:bg-gray-50"
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => onGameClick && onGameClick(game)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatGameDateTime(game)}
@@ -229,11 +240,19 @@ const GameHistoryTable = ({ userGames = [], loading = false }) => {
       {/* Mobile Cards */}
       <div className="md:hidden divide-y divide-gray-200">
         {sortedGames.map((game) => {
-          const totalCost = game.buyin + game.userRebuys * game.buyin;
-          const profit = game.userWinnings - totalCost;
+          const totalCost =
+            game.userTotalCost || game.buyin + game.userRebuys * game.buyin;
+          const profit =
+            game.userProfitLoss !== undefined
+              ? game.userProfitLoss
+              : game.userWinnings - totalCost;
 
           return (
-            <div key={`${game.id}-${game.groupId}`} className="p-4">
+            <div
+              key={`${game.id}-${game.groupId}`}
+              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => onGameClick && onGameClick(game)}
+            >
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <div className="text-sm font-medium text-gray-900">

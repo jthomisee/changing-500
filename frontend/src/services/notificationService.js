@@ -7,8 +7,8 @@ export const triggerGameInvitations = async (gameId) => {
       method: 'POST',
       body: JSON.stringify({
         gameId,
-        notificationType: 'gameInvitations'
-      })
+        notificationType: 'gameInvitations',
+      }),
     });
 
     return { success: true, data };
@@ -24,8 +24,8 @@ export const triggerGameResults = async (gameId) => {
       method: 'POST',
       body: JSON.stringify({
         gameId,
-        notificationType: 'gameResults'
-      })
+        notificationType: 'gameResults',
+      }),
     });
 
     return { success: true, data };
@@ -45,7 +45,7 @@ export const updateRSVPStatus = async (gameId, rsvpStatus) => {
   try {
     const data = await apiCall(`/games/${gameId}/rsvp`, {
       method: 'PUT',
-      body: JSON.stringify({ rsvpStatus })
+      body: JSON.stringify({ rsvpStatus }),
     });
 
     return { success: true, data };

@@ -6,7 +6,7 @@ const EmptyState = ({
   title,
   description,
   actionButton,
-  className = ''
+  className = '',
 }) => {
   return (
     <div className={`text-center py-12 px-6 ${className}`}>
@@ -23,20 +23,30 @@ const EmptyState = ({
 };
 
 // Specialized empty state components
-export const NoGamesEmptyState = ({ groupName, onAddGame, isAuthenticated }) => (
+export const NoGamesEmptyState = ({
+  groupName,
+  onAddGame,
+  isAuthenticated,
+}) => (
   <EmptyState
     icon={Calendar}
     title={`No games recorded yet${groupName ? ` for ${groupName}` : ''}`}
-    description={isAuthenticated ? "Add your first game to get started!" : "Games will appear here once added."}
-    actionButton={isAuthenticated && onAddGame ? (
-      <button
-        onClick={onAddGame}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
-      >
-        <Plus className="w-4 h-4" />
-        Add First Game
-      </button>
-    ) : null}
+    description={
+      isAuthenticated
+        ? 'Add your first game to get started!'
+        : 'Games will appear here once added.'
+    }
+    actionButton={
+      isAuthenticated && onAddGame ? (
+        <button
+          onClick={onAddGame}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          Add First Game
+        </button>
+      ) : null
+    }
   />
 );
 
@@ -53,15 +63,17 @@ export const NoGroupsEmptyState = ({ onCreateGroup }) => (
     icon={Users}
     title="You're not a member of any groups yet"
     description="Create your first group or ask to be invited to an existing one."
-    actionButton={onCreateGroup ? (
-      <button
-        onClick={onCreateGroup}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
-      >
-        <Plus className="w-4 h-4" />
-        Create Your First Group
-      </button>
-    ) : null}
+    actionButton={
+      onCreateGroup ? (
+        <button
+          onClick={onCreateGroup}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          Create Your First Group
+        </button>
+      ) : null
+    }
   />
 );
 

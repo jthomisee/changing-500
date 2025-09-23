@@ -73,26 +73,39 @@ exports.handler = async (event) => {
     const { firstName, lastName, email, phone, isAdmin } = JSON.parse(event.body || '{}');
     
     // Validate required fields
-    if (!firstName || !lastName || !email) {
+    if (!firstName || !lastName) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ 
-          error: 'First name, last name, and email are required'
+        body: JSON.stringify({
+          error: 'First name and last name are required'
         })
       };
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Require at least one of email or phone
+    if (!email && !phone) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ 
-          error: 'Invalid email format'
+        body: JSON.stringify({
+          error: 'Either email or phone number is required'
         })
       };
+    }
+
+    // Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            error: 'Invalid email format'
+          })
+        };
+      }
     }
 
     // Check if user exists
@@ -112,7 +125,7 @@ exports.handler = async (event) => {
     const existingUser = userResult.Item;
 
     // If email is being changed, check if new email already exists
-    if (email.toLowerCase() !== existingUser.email) {
+    if (email && email.toLowerCase() !== existingUser.email) {
       const existingEmailQuery = {
         TableName: USERS_TABLE,
         IndexName: 'email-index',
@@ -127,7 +140,7 @@ exports.handler = async (event) => {
         return {
           statusCode: 409,
           headers,
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             error: 'User with this email already exists'
           })
         };
@@ -136,19 +149,39 @@ exports.handler = async (event) => {
 
     // Update user
     const now = new Date().toISOString();
-    
+
+    // Build update expression and values conditionally
+    let updateExpression = 'SET firstName = :firstName, lastName = :lastName, isAdmin = :isAdmin, updatedAt = :updatedAt';
+    let expressionAttributeValues = {
+      ':firstName': firstName,
+      ':lastName': lastName,
+      ':isAdmin': Boolean(isAdmin),
+      ':updatedAt': now
+    };
+
+    // Handle email field - only set if provided, remove if empty
+    if (email && email.trim()) {
+      updateExpression += ', email = :email';
+      expressionAttributeValues[':email'] = email.toLowerCase();
+    } else {
+      // Remove email field entirely when empty to avoid GSI issues
+      updateExpression += ' REMOVE email';
+    }
+
+    // Handle phone field - only set if provided, remove if empty
+    if (phone && phone.trim()) {
+      updateExpression += ', phone = :phone';
+      expressionAttributeValues[':phone'] = phone.trim();
+    } else {
+      // Remove phone field entirely when empty to avoid GSI issues
+      updateExpression += ' REMOVE phone';
+    }
+
     const updateParams = {
       TableName: USERS_TABLE,
       Key: { userId },
-      UpdateExpression: 'SET firstName = :firstName, lastName = :lastName, email = :email, phone = :phone, isAdmin = :isAdmin, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':firstName': firstName,
-        ':lastName': lastName,
-        ':email': email.toLowerCase(),
-        ':phone': phone || null,
-        ':isAdmin': Boolean(isAdmin),
-        ':updatedAt': now
-      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
       ReturnValues: 'ALL_NEW'
     };
 

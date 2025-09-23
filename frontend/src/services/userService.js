@@ -1,13 +1,29 @@
 import { apiCall } from './api';
 
 // User search and management
-export const searchUsers = async (query = '') => {
+export const searchUsers = async (
+  query = '',
+  limit = 10,
+  lastEvaluatedKey = null
+) => {
   try {
-    const response = await apiCall(`/users/search?q=${encodeURIComponent(query)}`);
-    return response.users || [];
+    let url = `/users/search?search=${encodeURIComponent(query)}&limit=${limit}`;
+    if (lastEvaluatedKey) {
+      url += `&lastEvaluatedKey=${encodeURIComponent(lastEvaluatedKey)}`;
+    }
+    const response = await apiCall(url);
+    return {
+      users: response.users || [],
+      hasMore: response.hasMore || false,
+      lastEvaluatedKey: response.lastEvaluatedKey || null,
+    };
   } catch (error) {
     console.error('Error searching users:', error);
-    return [];
+    return {
+      users: [],
+      hasMore: false,
+      lastEvaluatedKey: null,
+    };
   }
 };
 
@@ -15,7 +31,7 @@ export const createUserFromSearch = async (userData) => {
   try {
     return await apiCall('/users/search', {
       method: 'POST',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(userData),
     });
   } catch (error) {
     console.error('Error creating user:', error);

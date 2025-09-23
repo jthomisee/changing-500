@@ -16,7 +16,23 @@ exports.handler = async (event) => {
 
   try {
     const qs = event.queryStringParameters || {};
+    const { limit = '10', lastEvaluatedKey } = qs;
+    const requestedLimit = parseInt(limit);
     let items = [];
+    let lastKey = null;
+
+    // Add pagination support
+    const paginationParams = {
+      Limit: requestedLimit
+    };
+
+    if (lastEvaluatedKey) {
+      try {
+        paginationParams.ExclusiveStartKey = JSON.parse(decodeURIComponent(lastEvaluatedKey));
+      } catch (error) {
+        console.error('Invalid lastEvaluatedKey:', error);
+      }
+    }
 
     if (qs.groupId) {
       // Query games by groupId via groupId-index
@@ -24,10 +40,12 @@ exports.handler = async (event) => {
         TableName: TABLE_NAME,
         IndexName: 'groupId-index',
         KeyConditionExpression: 'groupId = :groupId',
-        ExpressionAttributeValues: { ':groupId': qs.groupId }
+        ExpressionAttributeValues: { ':groupId': qs.groupId },
+        ...paginationParams
       };
       const result = await dynamodb.send(new QueryCommand(params));
       items = result.Items || [];
+      lastKey = result.LastEvaluatedKey;
     } else if ((qs.status || '').toLowerCase() === 'scheduled') {
       // Query scheduled games via status-date-index
       const params = {
@@ -36,28 +54,46 @@ exports.handler = async (event) => {
         KeyConditionExpression: '#status = :scheduled',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: { ':scheduled': 'scheduled' },
-        ScanIndexForward: true
+        ScanIndexForward: true,
+        ...paginationParams
       };
       const result = await dynamodb.send(new QueryCommand(params));
       items = result.Items || [];
+      lastKey = result.LastEvaluatedKey;
     } else {
       // Fallback to scan for all games (less efficient)
       const params = {
-        TableName: TABLE_NAME
+        TableName: TABLE_NAME,
+        ...paginationParams
       };
       const result = await dynamodb.send(new ScanCommand(params));
       items = result.Items || [];
+      lastKey = result.LastEvaluatedKey;
     }
     
+    // Sort games by date and game number
+    const sortedGames = items.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      return dateCompare !== 0 ? dateCompare : a.gameNumber - b.gameNumber;
+    });
+
+    const response = {
+      games: sortedGames,
+      count: sortedGames.length
+    };
+
+    // Add pagination info if there are more results
+    if (lastKey) {
+      response.lastEvaluatedKey = encodeURIComponent(JSON.stringify(lastKey));
+      response.hasMore = true;
+    } else {
+      response.hasMore = false;
+    }
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        games: items.sort((a, b) => {
-          const dateCompare = a.date.localeCompare(b.date);
-          return dateCompare !== 0 ? dateCompare : a.gameNumber - b.gameNumber;
-        })
-      })
+      body: JSON.stringify(response)
     };
   } catch (error) {
     console.error('Error:', error);

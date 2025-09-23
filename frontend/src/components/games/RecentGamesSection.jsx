@@ -1,8 +1,20 @@
 import React from 'react';
-import { Calendar, DollarSign, Users, Edit, Trash2, Trophy, MapPin } from 'lucide-react';
+import {
+  Calendar,
+  DollarSign,
+  Users,
+  Edit,
+  Trash2,
+  Trophy,
+  MapPin,
+  Mail,
+} from 'lucide-react';
 import LoadingButton from '../common/LoadingButton.jsx';
 import { calculatePoints } from '../../utils/gameUtils';
-import { NoGamesEmptyState, SelectGroupEmptyState } from '../common/EmptyState.jsx';
+import {
+  NoGamesEmptyState,
+  SelectGroupEmptyState,
+} from '../common/EmptyState.jsx';
 import { useGameContext } from '../../context/GameContext.jsx';
 
 const RecentGamesSection = ({ openAddGame }) => {
@@ -17,10 +29,10 @@ const RecentGamesSection = ({ openAddGame }) => {
     startEditingGame,
     deleteGame,
     getUserDisplayName,
-    isGameScheduled
+    isGameScheduled,
   } = useGameContext();
 
-  const recentGames = filteredGames.filter(game => !isGameScheduled(game));
+  const recentGames = filteredGames.filter((game) => !isGameScheduled(game));
 
   return (
     <div className="bg-white rounded-lg shadow-lg">
@@ -46,8 +58,12 @@ const RecentGamesSection = ({ openAddGame }) => {
           recentGames
             .sort((a, b) => {
               // Sort by date/time with most recent first
-              const aDateTime = new Date(`${a.date}T${a.time || '00:00'}:00.000Z`);
-              const bDateTime = new Date(`${b.date}T${b.time || '00:00'}:00.000Z`);
+              const aDateTime = new Date(
+                `${a.date}T${a.time || '00:00'}:00.000Z`
+              );
+              const bDateTime = new Date(
+                `${b.date}T${b.time || '00:00'}:00.000Z`
+              );
               return bDateTime - aDateTime; // Most recent first
             })
             .map((game) => (
@@ -66,8 +82,9 @@ const RecentGamesSection = ({ openAddGame }) => {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <DollarSign className="w-4 h-4" />
-                      ${game.results.reduce((sum, r) => sum + r.winnings, 0)} total
+                      <DollarSign className="w-4 h-4" />$
+                      {game.results.reduce((sum, r) => sum + r.winnings, 0)}{' '}
+                      total
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
@@ -84,14 +101,20 @@ const RecentGamesSection = ({ openAddGame }) => {
                       onClick={() => handleSendResults(game.id)}
                       loading={sendingNotifications}
                       disabled={!isAuthenticated}
-                      className={`px-3 py-1 text-sm rounded-lg ${
+                      className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg flex items-center gap-1 ${
                         isAuthenticated
                           ? 'bg-purple-600 text-white hover:bg-purple-700'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
-                      title={isAuthenticated ? "Send game results" : "Please login to send results"}
+                      title={
+                        isAuthenticated
+                          ? 'Send game results'
+                          : 'Please login to send results'
+                      }
                     >
-                      Send Results
+                      <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">Send Results</span>
+                      <span className="sm:hidden">Results</span>
                     </LoadingButton>
                     <button
                       onClick={() => isAuthenticated && startEditingGame(game)}
@@ -101,19 +124,35 @@ const RecentGamesSection = ({ openAddGame }) => {
                           : 'text-gray-400 cursor-not-allowed'
                       }`}
                       disabled={!isAuthenticated}
-                      title={isAuthenticated ? "Edit game" : "Please login to edit games"}
+                      title={
+                        isAuthenticated
+                          ? 'Edit game'
+                          : 'Please login to edit games'
+                      }
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => isAuthenticated && deleteGame(game.id)}
+                      onClick={() => {
+                        console.log(
+                          'Deleting game with ID:',
+                          game.id,
+                          'Full game object:',
+                          game
+                        );
+                        isAuthenticated && deleteGame(game.id);
+                      }}
                       className={`p-2 rounded-lg ${
                         isAuthenticated
                           ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
                           : 'text-gray-400 cursor-not-allowed'
                       }`}
                       disabled={!isAuthenticated}
-                      title={isAuthenticated ? "Delete game" : "Please login to delete games"}
+                      title={
+                        isAuthenticated
+                          ? 'Delete game'
+                          : 'Please login to delete games'
+                      }
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -132,10 +171,18 @@ const RecentGamesSection = ({ openAddGame }) => {
                           <th className="text-left py-2 px-3">Player</th>
                           {!isGameScheduled(game) && (
                             <>
-                              <th className="text-center py-2 px-3">Points</th>
-                              <th className="text-center py-2 px-3">Winnings</th>
+                              {game.gameType !== 'cash' && (
+                                <th className="text-center py-2 px-3">
+                                  Points
+                                </th>
+                              )}
+                              <th className="text-center py-2 px-3">
+                                Winnings
+                              </th>
                               <th className="text-center py-2 px-3">Rebuys</th>
-                              <th className="text-center py-2 px-3">Best Hand</th>
+                              <th className="text-center py-2 px-3">
+                                Best Hand
+                              </th>
                             </>
                           )}
                           {isGameScheduled(game) && (
@@ -148,10 +195,20 @@ const RecentGamesSection = ({ openAddGame }) => {
                           .slice()
                           .sort((a, b) => a.position - b.position)
                           .map((result, index) => {
-                            const points = calculatePoints(game.results, result);
+                            // Only calculate points for tournament games
+                            const points =
+                              game.gameType === 'cash'
+                                ? 0
+                                : calculatePoints(
+                                    game.results,
+                                    result,
+                                    game.gameType
+                                  );
                             const getRowColorClass = () => {
-                              if (result.position === 1) return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-b border-gray-200 last:border-b-0';
-                              if (result.position === 2) return 'bg-gradient-to-r from-slate-200 to-slate-100 border-b border-gray-200 last:border-b-0';
+                              if (result.position === 1)
+                                return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-b border-gray-200 last:border-b-0';
+                              if (result.position === 2)
+                                return 'bg-gradient-to-r from-slate-200 to-slate-100 border-b border-gray-200 last:border-b-0';
                               return 'border-b border-gray-200 last:border-b-0';
                             };
                             return (
@@ -159,20 +216,30 @@ const RecentGamesSection = ({ openAddGame }) => {
                                 {!isGameScheduled(game) && (
                                   <td className="py-2 px-3 font-medium">
                                     <div className="flex items-center gap-1">
-                                      {result.position === 1 && <Trophy className="w-3 h-3 text-yellow-600" />}
+                                      {result.position === 1 && (
+                                        <Trophy className="w-3 h-3 text-yellow-600" />
+                                      )}
                                       #{result.position}
                                     </div>
                                   </td>
                                 )}
-                                <td className="py-2 px-3 font-medium">{getUserDisplayName(result.userId)}</td>
+                                <td className="py-2 px-3 font-medium">
+                                  {getUserDisplayName(result.userId)}
+                                </td>
                                 {!isGameScheduled(game) && (
                                   <>
-                                    <td className="py-2 px-3 text-center text-blue-600 font-semibold">
-                                      {points.toFixed(1)}
-                                    </td>
-                                    <td className={`py-2 px-3 text-center font-medium ${
-                                      result.winnings >= 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}>
+                                    {game.gameType !== 'cash' && (
+                                      <td className="py-2 px-3 text-center text-blue-600 font-semibold">
+                                        {points.toFixed(1)}
+                                      </td>
+                                    )}
+                                    <td
+                                      className={`py-2 px-3 text-center font-medium ${
+                                        result.winnings >= 0
+                                          ? 'text-green-600'
+                                          : 'text-red-600'
+                                      }`}
+                                    >
                                       ${result.winnings.toFixed(0)}
                                     </td>
                                     <td className="py-2 px-3 text-center">
@@ -180,9 +247,13 @@ const RecentGamesSection = ({ openAddGame }) => {
                                     </td>
                                     <td className="py-2 px-3 text-center">
                                       {result.bestHandWinner ? (
-                                        <span className="text-purple-600 font-semibold">Won</span>
+                                        <span className="text-purple-600 font-semibold">
+                                          Won
+                                        </span>
                                       ) : result.bestHandParticipant ? (
-                                        <span className="text-gray-600">Played</span>
+                                        <span className="text-gray-600">
+                                          Played
+                                        </span>
                                       ) : (
                                         '-'
                                       )}
@@ -191,12 +262,17 @@ const RecentGamesSection = ({ openAddGame }) => {
                                 )}
                                 {isGameScheduled(game) && (
                                   <td className="py-2 px-3 text-center">
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                      result.rsvpStatus === 'yes' ? 'bg-green-100 text-green-800' :
-                                      result.rsvpStatus === 'no' ? 'bg-red-100 text-red-800' :
-                                      result.rsvpStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-gray-100 text-gray-800'
-                                    }`}>
+                                    <span
+                                      className={`px-2 py-1 rounded text-xs font-medium ${
+                                        result.rsvpStatus === 'yes'
+                                          ? 'bg-green-100 text-green-800'
+                                          : result.rsvpStatus === 'no'
+                                            ? 'bg-red-100 text-red-800'
+                                            : result.rsvpStatus === 'pending'
+                                              ? 'bg-yellow-100 text-yellow-800'
+                                              : 'bg-gray-100 text-gray-800'
+                                      }`}
+                                    >
                                       {result.rsvpStatus || 'Pending'}
                                     </span>
                                   </td>

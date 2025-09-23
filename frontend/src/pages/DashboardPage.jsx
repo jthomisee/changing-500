@@ -12,6 +12,7 @@ import {
 const DashboardPage = ({
   currentUser,
   selectedGroup,
+  groups,
   upcomingGames,
   standings,
   onRSVPChange,
@@ -184,13 +185,23 @@ const DashboardPage = ({
             onClick={() => onNavigateToGames()}
             color="blue"
           />
-          <ActionCard
-            title="Group Settings"
-            description="View leaderboard, manage members, or switch groups"
-            icon={Users}
-            onClick={() => onNavigateToGroups()}
-            color="green"
-          />
+          {groups && groups.length === 0 ? (
+            <ActionCard
+              title="Create or Join a Group"
+              description="Find a group to join or create your own to start playing"
+              icon={Users}
+              onClick={() => onNavigateToGroups('join')}
+              color="green"
+            />
+          ) : (
+            <ActionCard
+              title="Group Settings"
+              description="View leaderboard, manage members, or switch groups"
+              icon={Users}
+              onClick={() => onNavigateToGroups()}
+              color="green"
+            />
+          )}
         </div>
       </div>
     </div>

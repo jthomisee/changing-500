@@ -5,7 +5,7 @@ export const updateMyProfile = async (userData) => {
   try {
     const data = await apiCall(`/users/profile`, {
       method: 'PUT',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(userData),
     });
 
     return { success: true, user: data.user };
@@ -20,7 +20,7 @@ export const changePassword = async (passwordData) => {
   try {
     const data = await apiCall(`/users/password`, {
       method: 'PUT',
-      body: JSON.stringify(passwordData)
+      body: JSON.stringify(passwordData),
     });
 
     return { success: true, message: data.message };

@@ -34,7 +34,7 @@ export const GameProvider = ({
   gamesLoading,
   sendingNotifications,
   // Auth state
-  isAuthenticated
+  isAuthenticated,
 }) => {
   const value = {
     // Game data
@@ -59,12 +59,8 @@ export const GameProvider = ({
     gamesLoading,
     sendingNotifications,
     // Auth state
-    isAuthenticated
+    isAuthenticated,
   };
 
-  return (
-    <GameContext.Provider value={value}>
-      {children}
-    </GameContext.Provider>
-  );
+  return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };
