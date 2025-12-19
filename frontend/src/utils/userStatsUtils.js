@@ -44,23 +44,11 @@ export const getUserGamesAcrossGroups = (
         groupSideBets
       );
 
-      // Calculate cash game specific values
-      let userProfitLoss = 0;
-      let actualWinnings = userResult.winnings || 0;
-      let totalCost =
+      // Calculate tournament values
+      const actualWinnings = userResult.winnings || 0;
+      const totalCost =
         (game.buyin || 20) + (userResult.rebuys || 0) * (game.buyin || 20);
-
-      if (game.gameType === 'cash') {
-        // For cash games, profit/loss is cash-out minus buy-in (no rebuys)
-        const cashOut = userResult.cashOutAmount || 0;
-        const buyIn = userResult.buyInAmount || 0;
-        totalCost = buyIn;
-        actualWinnings = cashOut;
-        userProfitLoss = cashOut - totalCost + sideBetWinnings;
-      } else {
-        // For tournament games, use existing logic
-        userProfitLoss = actualWinnings - totalCost + sideBetWinnings;
-      }
+      const userProfitLoss = actualWinnings - totalCost + sideBetWinnings;
 
       userGames.push({
         ...game,
@@ -72,7 +60,7 @@ export const getUserGamesAcrossGroups = (
         userRebuys: userResult.rebuys,
         userProfitLoss, // P&L includes side bet winnings
         userTotalCost: totalCost,
-        userPoints: calculatePoints(game.results, userResult, game.gameType),
+        userPoints: calculatePoints(game.results, userResult),
         userBestHandParticipant: userResult.bestHandParticipant || false,
         userBestHandWinner: userResult.bestHandWinner || false,
         buyin: game.buyin || 20, // Default buyin if not specified
@@ -91,6 +79,11 @@ export const getUserGamesAcrossGroups = (
  * @returns {Object} Combined statistics object
  */
 export const calculateUserCombinedStats = (userGames, currentUser) => {
+  console.warn('=== CALCULATE USER COMBINED STATS (Game History) ===');
+  console.warn(
+    `Processing ${userGames?.length || 0} games for user: ${currentUser?.firstName || 'Unknown'}`
+  );
+
   if (!userGames?.length || !currentUser?.userId) {
     return {
       numGames: 0,
@@ -119,66 +112,163 @@ export const calculateUserCombinedStats = (userGames, currentUser) => {
     bestHandCosts: 0,
   };
 
-  userGames.forEach((game) => {
+  userGames.forEach((game, idx) => {
     const { userResult, buyin } = game;
+
+    // Debug: Log userResult structure for first game
+    if (idx === 0) {
+      console.warn('📋 First game userResult structure:', {
+        hasUserResult: !!userResult,
+        hasSideBets: !!userResult?.sideBets,
+        sideBetsLength: userResult?.sideBets?.length,
+        sideBetsArray: userResult?.sideBets,
+        bestHandParticipant: userResult?.bestHandParticipant,
+        bestHandWinner: userResult?.bestHandWinner,
+      });
+    }
 
     // Use pre-calculated values from getUserGamesAcrossGroups
     stats.totalWinnings += game.userWinnings || 0;
     stats.totalBuyins += game.userTotalCost || 0;
 
-    // Only count positions for tournament games
-    if (game.gameType !== 'cash' && userResult.position) {
+    // Count positions for tournament games
+    if (userResult.position) {
       stats.totalPositions += userResult.position;
     }
 
-    // Count wins differently for cash vs tournament games
-    if (game.gameType === 'cash') {
-      // For cash games, consider it a "win" if profit is positive
-      if (game.userProfitLoss > 0) {
-        stats.wins++;
-      }
-    } else {
-      // For tournament games, count 1st or 2nd place as wins
-      if (userResult.position === 1 || userResult.position === 2) {
-        stats.wins++;
-      }
+    // For tournament games, count 1st or 2nd place as wins
+    if (userResult.position === 1 || userResult.position === 2) {
+      stats.wins++;
     }
 
-    // Best hand tracking
-    if (userResult.bestHandParticipant) {
+    // Best hand tracking - check both legacy and new formats
+    let bestHandParticipant = false;
+    let bestHandWinner = false;
+
+    // Check legacy format first
+    if (
+      userResult.bestHandParticipant !== undefined ||
+      userResult.bestHandWinner !== undefined
+    ) {
+      bestHandParticipant = Boolean(userResult.bestHandParticipant);
+      bestHandWinner = Boolean(userResult.bestHandWinner);
+      console.warn(
+        `  ✅ Game ${idx + 1}: Using LEGACY format - participated: ${bestHandParticipant}, won: ${bestHandWinner}`
+      );
+    }
+    // Check new sideBets format
+    else if (userResult.sideBets && Array.isArray(userResult.sideBets)) {
+      const bestHandSideBet = userResult.sideBets.find(
+        (sb) =>
+          (sb.name && sb.name.toLowerCase().includes('best hand')) ||
+          sb.sideBetId === 'legacy-best-hand'
+      );
+      if (bestHandSideBet) {
+        bestHandParticipant = Boolean(bestHandSideBet.participated);
+        bestHandWinner = Boolean(bestHandSideBet.won);
+        console.warn(
+          `  ✅ Game ${idx + 1}: Using SIDEBETS format - participated: ${bestHandParticipant}, won: ${bestHandWinner}`,
+          bestHandSideBet
+        );
+      } else {
+        console.warn(
+          `  ❌ Game ${idx + 1}: sideBets array exists but no best hand side bet found`,
+          userResult.sideBets
+        );
+      }
+    } else {
+      console.warn(`  ⚠️ Game ${idx + 1}: No best hand data in either format`);
+    }
+
+    if (bestHandParticipant) {
       stats.bestHandParticipations++;
       stats.bestHandCosts += BEST_HAND_BET_AMOUNT;
     }
 
-    if (userResult.bestHandWinner) {
+    if (bestHandWinner) {
       stats.bestHandWins++;
-      // Calculate best hand winnings for this game
-      const bestHandParticipants = game.results.filter(
-        (r) => r.bestHandParticipant
-      ).length;
-      const bestHandWinners = game.results.filter(
-        (r) => r.bestHandWinner
-      ).length;
+      // Calculate best hand winnings for this game - check both formats
+      const bestHandParticipants = game.results.filter((r) => {
+        if (r.bestHandParticipant !== undefined) {
+          return Boolean(r.bestHandParticipant);
+        }
+        if (r.sideBets && Array.isArray(r.sideBets)) {
+          const bhSideBet = r.sideBets.find(
+            (sb) =>
+              (sb.name && sb.name.toLowerCase().includes('best hand')) ||
+              sb.sideBetId === 'legacy-best-hand'
+          );
+          return bhSideBet ? Boolean(bhSideBet.participated) : false;
+        }
+        return false;
+      }).length;
+
+      const bestHandWinners = game.results.filter((r) => {
+        if (r.bestHandWinner !== undefined) {
+          return Boolean(r.bestHandWinner);
+        }
+        if (r.sideBets && Array.isArray(r.sideBets)) {
+          const bhSideBet = r.sideBets.find(
+            (sb) =>
+              (sb.name && sb.name.toLowerCase().includes('best hand')) ||
+              sb.sideBetId === 'legacy-best-hand'
+          );
+          return bhSideBet ? Boolean(bhSideBet.won) : false;
+        }
+        return false;
+      }).length;
+
       const totalBestHandPot = bestHandParticipants * BEST_HAND_BET_AMOUNT;
       const winningsPerWinner =
         bestHandWinners > 0 ? totalBestHandPot / bestHandWinners : 0;
       stats.bestHandWinnings += winningsPerWinner;
     }
+
+    // Log each game with running totals
+    const runningTournamentWinnings = stats.totalWinnings;
+    const runningBestHandWinnings = stats.bestHandWinnings;
+    const runningTotalWinnings =
+      runningTournamentWinnings + runningBestHandWinnings;
+    const runningTotalCosts = stats.totalBuyins + stats.bestHandCosts;
+    const runningPL = runningTotalWinnings - runningTotalCosts;
+
+    console.warn(`Game ${idx + 1} (${game.date}):`);
+    console.warn(
+      `  Position: ${userResult.position}, Tournament Winnings: $${game.userWinnings || 0}`
+    );
+    console.warn(
+      `  Best Hand: ${bestHandParticipant ? 'Y' : 'N'}, Won: ${bestHandWinner ? 'Y' : 'N'}`
+    );
+    console.warn(
+      `  Costs: Buyin+Rebuys=$${game.userTotalCost || 0}, Best Hand=$${bestHandParticipant ? BEST_HAND_BET_AMOUNT : 0}`
+    );
+    console.warn(
+      `  📊 RUNNING: Tournament=$${runningTournamentWinnings.toFixed(2)}, BestHand=$${runningBestHandWinnings.toFixed(2)}, Total=$${runningTotalWinnings.toFixed(2)}, Costs=$${runningTotalCosts.toFixed(2)}, P&L=$${runningPL.toFixed(2)}`
+    );
   });
 
   // Calculate derived stats
   const winRate = stats.numGames > 0 ? (stats.wins / stats.numGames) * 100 : 0;
 
-  // Only calculate average position for tournament games
-  const tournamentGames = userGames.filter((game) => game.gameType !== 'cash');
+  // Calculate average position
   const avgPosition =
-    tournamentGames.length > 0
-      ? stats.totalPositions / tournamentGames.length
-      : 0;
+    stats.numGames > 0 ? stats.totalPositions / stats.numGames : 0;
 
   const totalCosts = stats.totalBuyins + stats.bestHandCosts;
   const totalEarnings = stats.totalWinnings + stats.bestHandWinnings;
   const profitLoss = totalEarnings - totalCosts;
+
+  console.warn('\n=== FINAL GAME HISTORY STATS ===');
+  console.warn(`Tournament Winnings: $${stats.totalWinnings.toFixed(2)}`);
+  console.warn(`Best Hand Winnings: $${stats.bestHandWinnings.toFixed(2)}`);
+  console.warn(`Total Winnings (displayed): $${totalEarnings.toFixed(2)}`);
+  console.warn(`Tournament Costs: $${stats.totalBuyins.toFixed(2)}`);
+  console.warn(`Best Hand Costs: $${stats.bestHandCosts.toFixed(2)}`);
+  console.warn(`Total Costs: $${totalCosts.toFixed(2)}`);
+  console.warn(`P&L: $${profitLoss.toFixed(2)}`);
+  console.warn(
+    `Best Hand: ${stats.bestHandWins} wins / ${stats.bestHandParticipations} participations`
+  );
 
   return {
     numGames: stats.numGames,

@@ -215,30 +215,14 @@ const Changing500 = () => {
     isLoading: standingsLoading,
   } = useStandings(filteredGames, groupUsers, groupUsersLoading);
 
-  // Create separate standings for tournament and cash games
+  // Create standings for tournament games
   const {
     standings: tournamentStandings,
     sortField: tournamentSortField,
     sortDirection: tournamentSortDirection,
     handleSort: handleTournamentSort,
     isLoading: tournamentStandingsLoading,
-  } = useStandings(
-    filteredGames.filter((game) => game.gameType !== 'cash'),
-    groupUsers,
-    groupUsersLoading
-  );
-
-  const {
-    standings: cashStandings,
-    sortField: cashSortField,
-    sortDirection: cashSortDirection,
-    handleSort: handleCashSort,
-    isLoading: cashStandingsLoading,
-  } = useStandings(
-    filteredGames.filter((game) => game.gameType === 'cash'),
-    groupUsers,
-    groupUsersLoading
-  );
+  } = useStandings(filteredGames, groupUsers, groupUsersLoading);
 
   // Mobile expandable rows state
   const [expandedRows, setExpandedRows] = useState(new Set());
@@ -582,11 +566,6 @@ const Changing500 = () => {
             tournamentSortField={tournamentSortField}
             tournamentSortDirection={tournamentSortDirection}
             handleTournamentSort={handleTournamentSort}
-            cashStandings={cashStandings}
-            cashStandingsLoading={cashStandingsLoading}
-            cashSortField={cashSortField}
-            cashSortDirection={cashSortDirection}
-            handleCashSort={handleCashSort}
             expandedRows={expandedRows}
             toggleRowExpanded={toggleRowExpanded}
             isMobile={isMobile}

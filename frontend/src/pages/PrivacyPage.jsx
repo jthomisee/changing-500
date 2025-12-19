@@ -172,6 +172,7 @@ const PrivacyPage = () => {
                 </li>
                 <li>We partner with Twilio for message delivery</li>
                 <li>Message and data rates may apply from your carrier</li>
+                <li>Message frequency may vary.</li>
                 <li>
                   You can opt-out anytime by replying "STOP" or updating your
                   preferences

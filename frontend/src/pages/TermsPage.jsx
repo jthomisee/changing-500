@@ -78,9 +78,8 @@ const TermsPage = () => {
                 <li>Service-related communications</li>
               </ul>
               <p>
-                <strong>Message Frequency:</strong> You may receive
-                approximately 1-3 messages per week, depending on your poker
-                group activity.
+                <strong>Message Frequency:</strong> Message frequency may vary,
+                depending on your poker group activity.
               </p>
               <p>
                 <strong>Message and Data Rates:</strong> Standard message and

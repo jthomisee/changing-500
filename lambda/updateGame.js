@@ -2,7 +2,6 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const { verifyAuthHeader } = require('./verifyJWT');
 const { migrateLegacySideBets, validateSideBets } = require('./utils/sideBetUtils');
-const { validatePayoutStructure, cleanPayoutStructure } = require('./utils/payoutUtils');
 
 // Helper function to reprocess waitlist when maxPlayers or waitlistEnabled changes
 function reprocessWaitlist(results, maxPlayers, waitlistEnabled) {
@@ -141,7 +140,17 @@ exports.handler = async (event) => {
       };
       
       // Migrate legacy side bet data to new format
-      return migrateLegacySideBets(baseResult, groupSideBets);
+      const migrated = migrateLegacySideBets(baseResult, groupSideBets);
+
+      // Ensure each sideBet entry includes timesParticipated (do NOT derive from rebuys)
+      if (Array.isArray(migrated.sideBets)) {
+        migrated.sideBets = migrated.sideBets.map(sb => ({
+          ...sb,
+          timesParticipated: sb.timesParticipated !== undefined ? sb.timesParticipated : (sb.participated ? 1 : 0)
+        }));
+      }
+
+      return migrated;
     });
     
     // Auto-detect ties by grouping results with same position
@@ -176,23 +185,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Clean and validate payout structure for tournament games
-    const gameType = gameData.gameType || currentGame.gameType || 'tournament';
-    let cleanedPayoutStructure = gameData.payoutStructure;
-    if (gameType === 'tournament' && gameData.payoutStructure) {
-      cleanedPayoutStructure = cleanPayoutStructure(gameData.payoutStructure);
-      const payoutErrors = validatePayoutStructure(cleanedPayoutStructure);
-      if (payoutErrors.length > 0) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            error: 'Payout structure validation failed',
-            details: payoutErrors
-          })
-        };
-      }
-    }
     
     // Handle waitlist reprocessing if maxPlayers or waitlistEnabled changed
     let waitlistToUpdate = currentGame.waitlist || [];
@@ -209,7 +201,7 @@ exports.handler = async (event) => {
     const updateParams = {
       TableName: TABLE_NAME,
       Key: { id: gameId },
-      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, #location = :location, selectedSideBets = :selectedSideBets, maxPlayers = :maxPlayers, waitlistEnabled = :waitlistEnabled, waitlist = :waitlist, gameType = :gameType, minBuyIn = :minBuyIn, maxBuyIn = :maxBuyIn, houseTake = :houseTake, houseTakeType = :houseTakeType, payoutStructure = :payoutStructure, updatedAt = :updatedAt, updatedBy = :updatedBy',
+      UpdateExpression: 'SET #date = :date, #time = :time, results = :results, groupId = :groupId, #status = :status, #location = :location, selectedSideBets = :selectedSideBets, maxPlayers = :maxPlayers, waitlistEnabled = :waitlistEnabled, waitlist = :waitlist, gameType = :gameType, buyin = :buyin, updatedAt = :updatedAt, updatedBy = :updatedBy',
       ExpressionAttributeNames: {
         '#date': 'date', // 'date' is a reserved word in DynamoDB
         '#time': 'time', // 'time' is a reserved word in DynamoDB
@@ -227,15 +219,8 @@ exports.handler = async (event) => {
         ':maxPlayers': gameData.maxPlayers,
         ':waitlistEnabled': gameData.waitlistEnabled !== undefined ? gameData.waitlistEnabled : (currentGame.waitlistEnabled || false),
         ':waitlist': waitlistToUpdate,
-        ':gameType': gameData.gameType || currentGame.gameType || 'tournament',
-        ':minBuyIn': gameData.minBuyIn !== undefined ? gameData.minBuyIn : (currentGame.minBuyIn || null),
-        ':maxBuyIn': gameData.maxBuyIn !== undefined ? gameData.maxBuyIn : (currentGame.maxBuyIn || null),
-        ':houseTake': gameData.houseTake !== undefined ? gameData.houseTake : (currentGame.houseTake || 0),
-        ':houseTakeType': gameData.houseTakeType || currentGame.houseTakeType || 'fixed',
-        ':payoutStructure': cleanedPayoutStructure || currentGame.payoutStructure || [
-          { position: 1, type: 'percentage', value: 70 },
-          { position: 2, type: 'buyin_return', value: 0 }
-        ],
+        ':gameType': 'tournament',
+        ':buyin': gameData.buyin || currentGame.buyin || 20,
         ':updatedAt': new Date().toISOString(),
         ':updatedBy': userId
       },

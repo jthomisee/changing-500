@@ -138,7 +138,7 @@ const DashboardPage = ({
           />
           <QuickStatCard
             title="Win Rate"
-            value={userStanding ? `${userStanding.winRate}%` : 'N/A'}
+            value={userStanding ? `${userStanding.winRate.toFixed(2)}%` : 'N/A'}
             subtitle="this season"
             icon={TrendingUp}
             color="green"

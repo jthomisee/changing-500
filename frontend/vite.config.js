@@ -19,8 +19,12 @@ export default defineConfig({
     open: true,
   },
   build: {
+    // Output to build/ directory instead of dist/
+    outDir: 'build',
     // Generate source maps for better debugging
     sourcemap: true,
+    // Keep console statements for debugging
+    minify: 'esbuild',
     // Optimize chunk splitting
     rollupOptions: {
       output: {
@@ -31,6 +35,10 @@ export default defineConfig({
         },
       },
     },
+  },
+  esbuild: {
+    // Don't remove console statements
+    drop: [],
   },
   optimizeDeps: {
     // Pre-bundle these dependencies for faster dev startup

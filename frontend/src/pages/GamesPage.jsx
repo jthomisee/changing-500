@@ -8,6 +8,7 @@ import {
   Edit,
   Mail,
   Trash2,
+  Download,
 } from 'lucide-react';
 
 // Import existing components
@@ -31,6 +32,7 @@ import {
 import StatsCard from '../components/common/StatsCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useGroupsContext } from '../context/GroupsContext.jsx';
+import { exportGamesToCSV } from '../utils/csvExport.js';
 
 const GamesPage = ({
   // Props from main app for Schedule and Manage tabs
@@ -167,16 +169,37 @@ const GamesPage = ({
     }
 
     // Filter to only completed (non-scheduled) and non-future games
+    console.warn(`\n=== GAME HISTORY FILTERING (GamesPage) ===`);
+    console.warn(`Total scoped games: ${historyGamesScoped.length}`);
+
     const completedGames = historyGamesScoped.filter((game) => {
       const status = (game.status || '').toLowerCase();
-      if (status === 'scheduled') return false;
+      if (status === 'scheduled') {
+        console.warn(`  Filtered OUT: ${game.date} - Status is scheduled`);
+        return false;
+      }
       const gameDateTime = new Date(
         `${game.date}T${game.time || '00:00'}:00.000Z`
       );
-      return (
-        gameDateTime <= new Date() && game.results && game.results.length > 0
-      );
+      const isFuture = gameDateTime > new Date();
+      const hasResults = game.results && game.results.length > 0;
+
+      if (isFuture) {
+        console.warn(
+          `  Filtered OUT: ${game.date} - Game is in the future (${gameDateTime.toISOString()})`
+        );
+        return false;
+      }
+      if (!hasResults) {
+        console.warn(`  Filtered OUT: ${game.date} - No results`);
+        return false;
+      }
+
+      console.warn(`  ✓ Included: ${game.date}`);
+      return true;
     });
+
+    console.warn(`Completed games after filter: ${completedGames.length}`);
 
     const userGamesWithResults = completedGames
       .map((game) => {
@@ -439,16 +462,34 @@ const GamesPage = ({
               <div className="mt-8">
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="p-6 border-b border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <Settings className="w-6 h-6 text-blue-600" />
-                      <h2 className="text-2xl font-semibold text-gray-800">
-                        Manage Past Games
-                      </h2>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <Settings className="w-6 h-6 text-blue-600" />
+                          <h2 className="text-2xl font-semibold text-gray-800">
+                            Manage Past Games
+                          </h2>
+                        </div>
+                        <p className="text-gray-600 mt-2">
+                          Edit results and send notifications for completed
+                          games in your group.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          exportGamesToCSV(
+                            completedGames,
+                            selectedGroup,
+                            groupUsers
+                          )
+                        }
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 transition-colors"
+                        disabled={completedGames.length === 0}
+                      >
+                        <Download className="w-4 h-4" />
+                        Export CSV
+                      </button>
                     </div>
-                    <p className="text-gray-600 mt-2">
-                      Edit results and send notifications for completed games in
-                      your group.
-                    </p>
                   </div>
 
                   {completedGames.length === 0 ? (

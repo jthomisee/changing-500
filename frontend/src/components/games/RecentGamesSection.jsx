@@ -171,11 +171,7 @@ const RecentGamesSection = ({ openAddGame }) => {
                           <th className="text-left py-2 px-3">Player</th>
                           {!isGameScheduled(game) && (
                             <>
-                              {game.gameType !== 'cash' && (
-                                <th className="text-center py-2 px-3">
-                                  Points
-                                </th>
-                              )}
+                              <th className="text-center py-2 px-3">Points</th>
                               <th className="text-center py-2 px-3">
                                 Winnings
                               </th>
@@ -195,15 +191,11 @@ const RecentGamesSection = ({ openAddGame }) => {
                           .slice()
                           .sort((a, b) => a.position - b.position)
                           .map((result, index) => {
-                            // Only calculate points for tournament games
-                            const points =
-                              game.gameType === 'cash'
-                                ? 0
-                                : calculatePoints(
-                                    game.results,
-                                    result,
-                                    game.gameType
-                                  );
+                            // Calculate points for tournament
+                            const points = calculatePoints(
+                              game.results,
+                              result
+                            );
                             const getRowColorClass = () => {
                               if (result.position === 1)
                                 return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-b border-gray-200 last:border-b-0';
@@ -228,11 +220,9 @@ const RecentGamesSection = ({ openAddGame }) => {
                                 </td>
                                 {!isGameScheduled(game) && (
                                   <>
-                                    {game.gameType !== 'cash' && (
-                                      <td className="py-2 px-3 text-center text-blue-600 font-semibold">
-                                        {points.toFixed(1)}
-                                      </td>
-                                    )}
+                                    <td className="py-2 px-3 text-center text-blue-600 font-semibold">
+                                      {points.toFixed(1)}
+                                    </td>
                                     <td
                                       className={`py-2 px-3 text-center font-medium ${
                                         result.winnings >= 0

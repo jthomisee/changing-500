@@ -60,6 +60,9 @@ export const useAllUserGames = (groups = [], currentUser) => {
     try {
       // Use the new efficient endpoint that queries by user's groups
       const userGames = await loadUserGames(currentUser.userId);
+      console.log(
+        `[useAllUserGames] Loaded ${userGames.length} games from API for user ${currentUser.userId}`
+      );
       setAllGames(userGames);
       setError('');
     } catch (err) {
@@ -73,20 +76,42 @@ export const useAllUserGames = (groups = [], currentUser) => {
 
   // Add group names and calculate P&L with side bet winnings
   const userGamesWithGroups = useMemo(() => {
-    if (!allGames.length || !groups.length || !currentUser?.userId) {
-      return allGames;
+    if (!allGames.length || !currentUser?.userId) {
+      console.log(
+        '[useAllUserGames] Memo early return - allGames.length:',
+        allGames.length,
+        'currentUser:',
+        currentUser?.userId
+      );
+      return [];
     }
 
-    return allGames.map((game) => {
+    // Wait for groups to load before processing games
+    if (!groups.length) {
+      console.log('[useAllUserGames] Memo waiting for groups to load');
+      return [];
+    }
+
+    console.log(
+      `[useAllUserGames] Processing ${allGames.length} games with ${groups.length} groups`
+    );
+
+    const processedGames = allGames.map((game) => {
       const group = groups.find((g) => g.groupId === game.groupId);
       const userResult = game.results?.find(
         (result) => result.userId === currentUser.userId
       );
 
       if (!userResult) {
+        console.warn(
+          `[useAllUserGames] User ${currentUser.userId} NOT found in game ${game.id} (${game.date})`,
+          '\nGame results userIds:',
+          game.results?.map((r) => r.userId)
+        );
         return {
           ...game,
           groupName: group?.name || 'Unknown Group',
+          _missingUserResult: true, // Debug flag
         };
       }
 
@@ -99,27 +124,16 @@ export const useAllUserGames = (groups = [], currentUser) => {
       );
 
       // Calculate total cost and profit including side bet winnings
-      let userProfitLoss = 0;
-      let actualWinnings = userResult.winnings || 0;
-      let totalCost =
+      const actualWinnings = userResult.winnings || 0;
+      const totalCost =
         (game.buyin || 20) + (userResult.rebuys || 0) * (game.buyin || 20);
-
-      if (game.gameType === 'cash') {
-        // For cash games, profit/loss is cash-out minus buy-in (no rebuys)
-        const cashOut = userResult.cashOutAmount || 0;
-        const buyIn = userResult.buyInAmount || 0;
-        totalCost = buyIn;
-        actualWinnings = cashOut;
-        userProfitLoss = cashOut - totalCost + sideBetWinnings;
-      } else {
-        // For tournament games, use existing logic
-        userProfitLoss = actualWinnings - totalCost + sideBetWinnings;
-      }
+      const userProfitLoss = actualWinnings - totalCost + sideBetWinnings;
 
       return {
         ...game,
         groupName: group?.name || 'Unknown Group',
         // Properties expected by GameHistoryTable
+        userResult, // Pass full userResult object for stats calculations
         userPosition: userResult.position || 999,
         userWinnings: actualWinnings, // Winnings should only be the prize money, not including side bets
         userSideBetWinnings: sideBetWinnings,
@@ -131,6 +145,12 @@ export const useAllUserGames = (groups = [], currentUser) => {
         buyin: game.buyin || 20,
       };
     });
+
+    console.log(
+      `[useAllUserGames] Processed games: ${processedGames.length} total, ${processedGames.filter((g) => g._missingUserResult).length} missing userResult`
+    );
+
+    return processedGames;
   }, [allGames, groups, groupSideBetsMap, currentUser?.userId]);
 
   // Load games when groups or user changes

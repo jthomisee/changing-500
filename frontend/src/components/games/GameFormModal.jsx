@@ -49,25 +49,8 @@ const GameFormModal = ({
       updateGameData('waitlistEnabled', template.waitlistEnabled);
     }
 
-    // Apply game type and related settings
-    if (template.gameType) {
-      updateGameData('gameType', template.gameType);
-    }
-    if (template.minBuyIn) {
-      updateGameData('minBuyIn', template.minBuyIn);
-    }
-    if (template.maxBuyIn) {
-      updateGameData('maxBuyIn', template.maxBuyIn);
-    }
-    if (template.houseTake !== undefined) {
-      updateGameData('houseTake', template.houseTake);
-    }
-    if (template.houseTakeType) {
-      updateGameData('houseTakeType', template.houseTakeType);
-    }
-    if (template.payoutStructure) {
-      updateGameData('payoutStructure', template.payoutStructure);
-    }
+    // Always use tournament game type (ignore legacy templates)
+    // minBuyIn and maxBuyIn are no longer used
 
     // Apply side bets
     if (template.sideBets && template.sideBets.length > 0) {
@@ -84,9 +67,6 @@ const GameFormModal = ({
         rebuys: 0,
         rsvpStatus: 'pending',
         sideBets: [],
-        // Cash game specific fields
-        buyInAmount: 0,
-        cashOutAmount: 0,
       }));
 
       // Ensure we have at least one result even if template has no players
@@ -98,9 +78,6 @@ const GameFormModal = ({
           rebuys: 0,
           rsvpStatus: 'pending',
           sideBets: [],
-          // Cash game specific fields
-          buyInAmount: 0,
-          cashOutAmount: 0,
         });
       }
 
@@ -214,31 +191,9 @@ const GameFormModal = ({
               </p>
             </div>
 
-            {/* Game Type Selection */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                Game Type *
-              </label>
-              <select
-                value={newGame.gameType || 'tournament'}
-                onChange={(e) => updateGameData('gameType', e.target.value)}
-                className="w-full max-w-md border rounded px-4 py-3 text-base"
-              >
-                <option value="tournament">Tournament</option>
-                <option value="cash">Cash Game</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {newGame.gameType === 'cash'
-                  ? 'Cash games track buy-ins and cash-outs (no positions needed)'
-                  : 'Tournament games track positions and payouts'}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                {newGame.gameType === 'cash'
-                  ? 'Default Buy-in ($)'
-                  : 'Buy-in Amount ($)'}
+                Buy-in Amount ($)
               </label>
               <input
                 type="number"
@@ -251,226 +206,9 @@ const GameFormModal = ({
                 max="1000"
               />
               <p className="text-xs text-gray-500 mt-1">
-                {newGame.gameType === 'cash'
-                  ? 'Suggested buy-in amount (players can buy in for different amounts)'
-                  : 'Tournament buy-in amount (all players pay this amount)'}
+                Buy-in amount (all players pay this amount)
               </p>
             </div>
-
-            {/* Cash Game specific fields */}
-            {newGame.gameType === 'cash' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Min Buy-in ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={newGame.minBuyIn || 20}
-                    onChange={(e) =>
-                      updateGameData('minBuyIn', parseInt(e.target.value) || 20)
-                    }
-                    className="w-full border rounded px-4 py-3 text-base"
-                    min="1"
-                    max="1000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Max Buy-in ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={newGame.maxBuyIn || 200}
-                    onChange={(e) =>
-                      updateGameData(
-                        'maxBuyIn',
-                        parseInt(e.target.value) || 200
-                      )
-                    }
-                    className="w-full border rounded px-4 py-3 text-base"
-                    min="1"
-                    max="10000"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* House Take Configuration */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                House Take
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <select
-                    value={newGame.houseTakeType || 'fixed'}
-                    onChange={(e) =>
-                      updateGameData('houseTakeType', e.target.value)
-                    }
-                    className="w-full border rounded px-4 py-3 text-base"
-                  >
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="percentage">Percentage</option>
-                  </select>
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    value={newGame.houseTake || 0}
-                    onChange={(e) =>
-                      updateGameData(
-                        'houseTake',
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full border rounded px-4 py-3 text-base"
-                    min="0"
-                    max={newGame.houseTakeType === 'percentage' ? 100 : 1000}
-                    step={newGame.houseTakeType === 'percentage' ? '0.1' : '1'}
-                    placeholder={
-                      newGame.houseTakeType === 'percentage' ? '0' : '0'
-                    }
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {newGame.houseTakeType === 'percentage'
-                  ? 'Percentage of total pot taken by house'
-                  : 'Fixed dollar amount taken by house'}
-              </p>
-            </div>
-
-            {/* Tournament Payout Structure */}
-            {newGame.gameType === 'tournament' && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Payout Structure
-                </label>
-                <div className="space-y-2">
-                  {(newGame.payoutStructure || []).map((payout, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-4 gap-2 items-center"
-                    >
-                      <div>
-                        <select
-                          value={payout.position}
-                          onChange={(e) => {
-                            const newPayouts = [
-                              ...(newGame.payoutStructure || []),
-                            ];
-                            newPayouts[index] = {
-                              ...payout,
-                              position: parseInt(e.target.value),
-                            };
-                            updateGameData('payoutStructure', newPayouts);
-                          }}
-                          className="w-full border rounded px-2 py-1 text-sm"
-                        >
-                          {[1, 2, 3, 4, 5].map((pos) => (
-                            <option key={pos} value={pos}>
-                              {pos}st
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <select
-                          value={payout.type}
-                          onChange={(e) => {
-                            const newPayouts = [
-                              ...(newGame.payoutStructure || []),
-                            ];
-                            newPayouts[index] = {
-                              ...payout,
-                              type: e.target.value,
-                              // Clear value for types that don't need it
-                              value:
-                                e.target.value === 'buyin_return' ||
-                                e.target.value === 'remaining'
-                                  ? 0
-                                  : payout.value,
-                            };
-                            updateGameData('payoutStructure', newPayouts);
-                          }}
-                          className="w-full border rounded px-2 py-1 text-sm"
-                        >
-                          <option value="percentage">% of pot</option>
-                          <option value="fixed">Fixed amount</option>
-                          <option value="buyin_return">Buy-in back</option>
-                          <option value="remaining">Remaining pot</option>
-                        </select>
-                      </div>
-                      {payout.type !== 'buyin_return' &&
-                        payout.type !== 'remaining' && (
-                          <div>
-                            <input
-                              type="number"
-                              value={payout.value}
-                              onChange={(e) => {
-                                const newPayouts = [
-                                  ...(newGame.payoutStructure || []),
-                                ];
-                                newPayouts[index] = {
-                                  ...payout,
-                                  value: parseFloat(e.target.value) || 0,
-                                };
-                                updateGameData('payoutStructure', newPayouts);
-                              }}
-                              className="w-full border rounded px-2 py-1 text-sm"
-                              min="0"
-                              max={payout.type === 'percentage' ? 100 : 10000}
-                              step={payout.type === 'percentage' ? '0.1' : '1'}
-                            />
-                          </div>
-                        )}
-                      {(payout.type === 'buyin_return' ||
-                        payout.type === 'remaining') && (
-                        <div className="text-center text-sm text-gray-500 py-2">
-                          {payout.type === 'buyin_return'
-                            ? 'Auto'
-                            : 'Calculated'}
-                        </div>
-                      )}
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newPayouts = [
-                              ...(newGame.payoutStructure || []),
-                            ];
-                            newPayouts.splice(index, 1);
-                            updateGameData('payoutStructure', newPayouts);
-                          }}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newPayouts = [...(newGame.payoutStructure || [])];
-                      newPayouts.push({
-                        position: Math.max(1, newPayouts.length + 1),
-                        type: 'percentage',
-                        value: 0,
-                      });
-                      updateGameData('payoutStructure', newPayouts);
-                    }}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    + Add Payout Rule
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Define how winnings are distributed to tournament finishers
-                </p>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -651,114 +389,61 @@ const GameFormModal = ({
                       (isEditing && newGame.status === 'scheduled')
                     ) && (
                       <>
-                        {/* Tournament game fields */}
-                        {newGame.gameType === 'tournament' && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Position
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={result.position}
-                                onChange={(e) =>
-                                  updatePlayerResult(
-                                    index,
-                                    'position',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded px-3 py-2 text-base"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Winnings ($)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={result.winnings}
-                                onChange={(e) =>
-                                  updatePlayerResult(
-                                    index,
-                                    'winnings',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded px-3 py-2 text-base"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Rebuys
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={result.rebuys}
-                                onChange={(e) =>
-                                  updatePlayerResult(
-                                    index,
-                                    'rebuys',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded px-3 py-2 text-base"
-                              />
-                            </div>
-                          </>
-                        )}
-
-                        {/* Cash game fields */}
-                        {newGame.gameType === 'cash' && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Buy-in Amount ($)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={result.buyInAmount || ''}
-                                onChange={(e) =>
-                                  updatePlayerResult(
-                                    index,
-                                    'buyInAmount',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded px-3 py-2 text-base"
-                                placeholder={`Min: $${newGame.minBuyIn || 20}, Max: $${newGame.maxBuyIn || 200}`}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Cash-out Amount ($)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={result.cashOutAmount || ''}
-                                onChange={(e) =>
-                                  updatePlayerResult(
-                                    index,
-                                    'cashOutAmount',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full border rounded px-3 py-2 text-base"
-                                placeholder="Amount player left with"
-                                required
-                              />
-                            </div>
-                          </>
-                        )}
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Position
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={result.position}
+                            onChange={(e) =>
+                              updatePlayerResult(
+                                index,
+                                'position',
+                                e.target.value
+                              )
+                            }
+                            className="w-full border rounded px-3 py-2 text-base"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Winnings ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={result.winnings}
+                            onChange={(e) =>
+                              updatePlayerResult(
+                                index,
+                                'winnings',
+                                e.target.value
+                              )
+                            }
+                            className="w-full border rounded px-3 py-2 text-base"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Rebuys
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={result.rebuys}
+                            onChange={(e) =>
+                              updatePlayerResult(
+                                index,
+                                'rebuys',
+                                e.target.value
+                              )
+                            }
+                            className="w-full border rounded px-3 py-2 text-base"
+                          />
+                        </div>
                       </>
                     )}
                     {((!isEditing &&
@@ -824,6 +509,7 @@ const GameFormModal = ({
                               amount: sideBet.amount,
                               participated: false,
                               won: false,
+                              timesParticipated: 0,
                             };
 
                             return (
@@ -860,6 +546,14 @@ const GameFormModal = ({
                                           updatedSideBets.push({
                                             ...playerSideBet,
                                             participated: e.target.checked,
+                                            // if enabling participation and timesParticipated was 0, default to 1
+                                            timesParticipated:
+                                              (playerSideBet.timesParticipated ||
+                                                0) > 0
+                                                ? playerSideBet.timesParticipated
+                                                : e.target.checked
+                                                  ? 1
+                                                  : 0,
                                           });
                                         }
                                         updatePlayerResult(
@@ -896,6 +590,14 @@ const GameFormModal = ({
                                             ...playerSideBet,
                                             participated: newParticipated,
                                             won: e.target.checked,
+                                            // ensure timesParticipated at least 1 if marked as winner
+                                            timesParticipated:
+                                              (playerSideBet.timesParticipated ||
+                                                0) > 0
+                                                ? playerSideBet.timesParticipated
+                                                : e.target.checked
+                                                  ? 1
+                                                  : 0,
                                           });
                                         }
                                         updatePlayerResult(
@@ -908,6 +610,49 @@ const GameFormModal = ({
                                     />
                                     Won
                                   </label>
+                                  <div className="flex items-center">
+                                    <label className="text-sm mr-2">
+                                      Times
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={
+                                        playerSideBet.timesParticipated || 0
+                                      }
+                                      onChange={(e) => {
+                                        const val = parseInt(
+                                          e.target.value || 0
+                                        );
+                                        const sideBets = result.sideBets || [];
+                                        const updatedSideBets = sideBets.filter(
+                                          (sb) => sb.sideBetId !== sideBetId
+                                        );
+                                        // if val > 0, mark participated true
+                                        if (val > 0) {
+                                          updatedSideBets.push({
+                                            ...playerSideBet,
+                                            participated: true,
+                                            timesParticipated: val,
+                                          });
+                                        } else if (playerSideBet.won) {
+                                          // Keep if won
+                                          updatedSideBets.push({
+                                            ...playerSideBet,
+                                            participated: true,
+                                            timesParticipated: val,
+                                          });
+                                        }
+
+                                        updatePlayerResult(
+                                          index,
+                                          'sideBets',
+                                          updatedSideBets
+                                        );
+                                      }}
+                                      className="w-16 border rounded px-2 py-1 text-sm"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             );

@@ -3,7 +3,6 @@ const { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } = require(
 const { v4: uuidv4 } = require('uuid');
 const { verifyAuthHeader } = require('./verifyJWT');
 const { migrateLegacySideBets, validateSideBets } = require('./utils/sideBetUtils');
-const { validatePayoutStructure, cleanPayoutStructure } = require('./utils/payoutUtils');
 
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
@@ -98,7 +97,17 @@ exports.handler = async (event) => {
       };
       
       // Migrate legacy side bet data to new format
-      return migrateLegacySideBets(baseResult, groupSideBets);
+      const migrated = migrateLegacySideBets(baseResult, groupSideBets);
+
+      // Ensure each sideBet entry includes timesParticipated (do NOT derive from rebuys)
+      if (Array.isArray(migrated.sideBets)) {
+        migrated.sideBets = migrated.sideBets.map(sb => ({
+          ...sb,
+          timesParticipated: sb.timesParticipated !== undefined ? sb.timesParticipated : (sb.participated ? 1 : 0)
+        }));
+      }
+
+      return migrated;
     });
     
     // Auto-detect ties by grouping results with same position
@@ -133,22 +142,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Clean and validate payout structure for tournament games
-    let cleanedPayoutStructure = gameData.payoutStructure;
-    if (gameData.gameType === 'tournament' && gameData.payoutStructure) {
-      cleanedPayoutStructure = cleanPayoutStructure(gameData.payoutStructure);
-      const payoutErrors = validatePayoutStructure(cleanedPayoutStructure);
-      if (payoutErrors.length > 0) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({
-            error: 'Payout structure validation failed',
-            details: payoutErrors
-          })
-        };
-      }
-    }
     
     // Generate unique ID
     const id = `game_${gameData.date.replace(/-/g, '')}_${uuidv4().substring(0, 8)}`;
@@ -165,22 +158,8 @@ exports.handler = async (event) => {
       waitlistEnabled: gameData.waitlistEnabled || false, // Whether waitlist is enabled
       waitlist: [], // Initialize empty waitlist
 
-      // Game type and configuration
-      gameType: gameData.gameType || 'tournament', // 'cash' or 'tournament'
-
-      // Cash game settings
-      minBuyIn: gameData.minBuyIn || null,
-      maxBuyIn: gameData.maxBuyIn || null,
-
-      // House take configuration
-      houseTake: gameData.houseTake || 0,
-      houseTakeType: gameData.houseTakeType || 'fixed', // 'fixed' or 'percentage'
-
-      // Tournament payout structure
-      payoutStructure: cleanedPayoutStructure || [
-        { position: 1, type: 'percentage', value: 70 },
-        { position: 2, type: 'buyin_return', value: 0 }
-      ]
+      // Game type - always tournament
+      gameType: 'tournament',
     };
 
     const params = {

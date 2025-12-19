@@ -2,19 +2,14 @@ import { BEST_HAND_BET_AMOUNT } from '../constants/config';
 
 // Calculate points for a player's position in a game
 // Points = Split points for tied positions
-// Returns 0 for cash games (no points system)
-export const calculatePoints = (
-  results,
-  playerResult,
-  gameType = 'tournament'
-) => {
-  // Cash games don't use points
-  if (gameType === 'cash') {
-    return 0;
-  }
-
+export const calculatePoints = (results, playerResult) => {
   const totalPlayers = results.length;
   const position = playerResult.position;
+
+  // Return 0 if position is not valid (undefined, null, 0, or non-numeric)
+  if (!position || typeof position !== 'number' || position < 1) {
+    return 0;
+  }
 
   // Find all players with the same position (tied players)
   const tiedPlayers = results.filter((r) => r.position === position);
@@ -42,11 +37,10 @@ export const calculatePoints = (
 };
 
 // Calculate season standings for all players
-export const calculateSeasonStandings = (
-  games,
-  users = [],
-  gameTypeFilter = null
-) => {
+export const calculateSeasonStandings = (games, users = []) => {
+  console.warn('=== CALCULATE SEASON STANDINGS START ===');
+  console.warn(`Total games: ${games.length}, Total users: ${users.length}`);
+
   const playerStats = {};
 
   // Create a lookup map for users by ID
@@ -56,16 +50,9 @@ export const calculateSeasonStandings = (
   });
 
   // Filter out scheduled games from leaderboard calculations
-  let completedGames = games.filter((game) => game.status !== 'scheduled');
+  const completedGames = games.filter((game) => game.status !== 'scheduled');
 
-  // Filter by game type if specified
-  if (gameTypeFilter) {
-    completedGames = completedGames.filter(
-      (game) => game.gameType === gameTypeFilter
-    );
-  }
-
-  completedGames.forEach((game) => {
+  completedGames.forEach((game, gameIndex) => {
     // Use the game's configured buy-in amount, default to $20 if not set
     const gameBuyinAmount = game.buyin || 20;
 
@@ -120,14 +107,6 @@ export const calculateSeasonStandings = (
 
       // Create placeholder user data if user not found (likely removed/deleted user)
       if (!user) {
-        // Only warn if this is likely a real missing user (not a loading state issue)
-        if (users.length > 0) {
-          console.warn('User not found for game result:', {
-            userId,
-            gameDate: game.date,
-          });
-        }
-
         user = {
           userId: userId,
           firstName: 'Unknown',
@@ -159,39 +138,28 @@ export const calculateSeasonStandings = (
 
       const stats = playerStats[userId];
       stats.games++;
-      stats.totalWinnings += result.winnings;
-      stats.totalBuyins +=
-        gameBuyinAmount + (result.rebuys || 0) * gameBuyinAmount; // Use game's buyin + rebuy amounts
 
-      // Only calculate points for tournament games
-      if (game.gameType !== 'cash') {
-        stats.points += calculatePoints(game.results, result, game.gameType);
-      }
+      const winnings = Number(result.winnings) || 0;
+      stats.totalWinnings += winnings;
+
+      const rebuys = Number(result.rebuys) || 0;
+      stats.totalBuyins += gameBuyinAmount + rebuys * gameBuyinAmount; // Use game's buyin + rebuy amounts
+
+      // Calculate points for tournament
+      stats.points += calculatePoints(game.results, result);
 
       stats.gameHistory.push({
         date: game.date,
         position: result.position,
-        winnings: result.winnings,
+        winnings: result.winnings || 0,
         rebuys: result.rebuys || 0,
-        points:
-          game.gameType === 'cash'
-            ? 0
-            : calculatePoints(game.results, result, game.gameType),
+        points: calculatePoints(game.results, result),
         buyin: gameBuyinAmount, // Track the buy-in for this specific game
-        gameType: game.gameType, // Track game type for history
       });
 
-      // Define wins differently for cash vs tournament games
-      if (game.gameType === 'cash') {
-        // For cash games, a "win" is a profitable session
-        if (result.winnings > 0) {
-          stats.wins++;
-        }
-      } else {
-        // For tournament games, a "win" is finishing 1st or 2nd
-        if (result.position === 1 || result.position === 2) {
-          stats.wins++;
-        }
+      // For tournament games, a "win" is finishing 1st or 2nd
+      if (result.position === 1 || result.position === 2) {
+        stats.wins++;
       }
 
       // Side bet tracking
@@ -228,6 +196,36 @@ export const calculateSeasonStandings = (
         stats.bestHandWinCount++;
         stats.bestHandWinnings += bestHandWinningsPerWinner;
       }
+
+      // Log each game for the first player (for debugging)
+      const isFirstPlayer =
+        Object.keys(playerStats).length === 1 &&
+        stats === Object.values(playerStats)[0];
+      if (isFirstPlayer) {
+        const runningTotalWinnings =
+          stats.totalWinnings + stats.bestHandWinnings;
+        const runningTotalBuyins = stats.totalBuyins + stats.bestHandCosts;
+        const runningPL = runningTotalWinnings - runningTotalBuyins;
+
+        console.warn(
+          `Game ${gameIndex + 1} (${game.date}) - ${stats.user?.firstName || userId}:`
+        );
+        console.warn(
+          `  Position: ${result.position}, Winnings: $${winnings}, Rebuys: ${rebuys}`
+        );
+        console.warn(
+          `  Best Hand: ${bestHandParticipant ? 'Participated' : 'No'}, ${bestHandWinner ? 'WON' : ''}`
+        );
+        console.warn(
+          `  Game Buyin: $${gameBuyinAmount + rebuys * gameBuyinAmount}, Best Hand: $${bestHandParticipant ? BEST_HAND_BET_AMOUNT : 0}`
+        );
+        console.warn(
+          `  Game Net: $${winnings - (gameBuyinAmount + rebuys * gameBuyinAmount) - (bestHandParticipant ? BEST_HAND_BET_AMOUNT : 0) + (bestHandWinner ? bestHandWinningsPerWinner : 0)}`
+        );
+        console.warn(
+          `  📊 RUNNING TOTALS: Winnings: $${runningTotalWinnings.toFixed(2)}, Buyins: $${runningTotalBuyins.toFixed(2)}, P&L: $${runningPL.toFixed(2)}`
+        );
+      }
     });
   });
 
@@ -238,25 +236,37 @@ export const calculateSeasonStandings = (
     const netWinnings = winnings - totalBuyins;
     const winRate = stats.games > 0 ? (stats.wins / stats.games) * 100 : 0;
 
-    // Only calculate tournament-specific stats if we have tournament games
-    const hasTournamentGames = stats.gameHistory.some(
-      (game) => game.gameType !== 'cash'
-    );
-    const avgPosition = hasTournamentGames
-      ? stats.gameHistory
-          .filter((game) => game.gameType !== 'cash' && game.position > 0)
-          .reduce((sum, game, index, filteredGames) => {
-            return index === filteredGames.length - 1
-              ? (sum + game.position) / filteredGames.length
-              : sum + game.position;
-          }, 0) || 0
-      : 0;
+    // Calculate average position
+    const avgPosition =
+      stats.gameHistory
+        .filter((game) => game.position > 0)
+        .reduce((sum, game, index, filteredGames) => {
+          return index === filteredGames.length - 1
+            ? (sum + game.position) / filteredGames.length
+            : sum + game.position;
+        }, 0) || 0;
 
-    // Calculate current streak (different logic for cash vs tournament)
-    const { currentStreak, streakType } =
-      gameTypeFilter === 'cash'
-        ? calculateCashStreak(stats.gameHistory)
-        : calculateStreak(stats.gameHistory);
+    // Calculate current streak
+    const { currentStreak, streakType } = calculateStreak(stats.gameHistory);
+
+    // Log final stats for first player
+    if (stats === Object.values(playerStats)[0]) {
+      console.warn(
+        `\n=== FINAL STATS FOR ${stats.user?.firstName || 'Unknown'} ===`
+      );
+      console.warn(`Total Games: ${stats.games}`);
+      console.warn(`Tournament Winnings: $${stats.totalWinnings.toFixed(2)}`);
+      console.warn(`Best Hand Winnings: $${stats.bestHandWinnings.toFixed(2)}`);
+      console.warn(`Total Winnings: $${winnings.toFixed(2)}`);
+      console.warn(`Tournament Buyins: $${stats.totalBuyins.toFixed(2)}`);
+      console.warn(`Best Hand Costs: $${stats.bestHandCosts.toFixed(2)}`);
+      console.warn(`Total Buyins: $${totalBuyins.toFixed(2)}`);
+      console.warn(`Net P&L: $${netWinnings.toFixed(2)}`);
+      console.warn(
+        `Best Hand Stats: ${stats.bestHandWinCount} wins / ${stats.bestHandParticipationCount} participations`
+      );
+      console.warn(`Current Streak: ${streakType} ${currentStreak}`);
+    }
 
     return {
       ...stats,
@@ -286,8 +296,17 @@ const calculateStreak = (gameHistory) => {
     return { currentStreak: 0, streakType: null };
   }
 
+  // Filter out games with invalid positions (shouldn't count toward streaks)
+  const validGames = gameHistory.filter(
+    (game) => game.position && game.position > 0
+  );
+
+  if (validGames.length === 0) {
+    return { currentStreak: 0, streakType: null };
+  }
+
   // Sort by date to get chronological order
-  const sortedGames = [...gameHistory].sort(
+  const sortedGames = [...validGames].sort(
     (a, b) => new Date(a.date) - new Date(b.date)
   );
 
@@ -306,48 +325,6 @@ const calculateStreak = (gameHistory) => {
     } else if (
       (streakType === 'win' && isWin) ||
       (streakType === 'loss' && !isWin)
-    ) {
-      // Continue current streak
-      currentStreak++;
-    } else {
-      // Streak broken
-      break;
-    }
-  }
-
-  return { currentStreak, streakType };
-};
-
-// Calculate current profit/loss streak for cash games
-const calculateCashStreak = (gameHistory) => {
-  if (gameHistory.length === 0) {
-    return { currentStreak: 0, streakType: null };
-  }
-
-  // Sort by date to get chronological order
-  const sortedGames = [...gameHistory]
-    .filter((game) => game.gameType === 'cash') // Only consider cash games
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  if (sortedGames.length === 0) {
-    return { currentStreak: 0, streakType: null };
-  }
-
-  let currentStreak = 0;
-  let streakType = null;
-
-  // Start from the most recent game and work backwards
-  for (let i = sortedGames.length - 1; i >= 0; i--) {
-    const game = sortedGames[i];
-    const isProfit = game.winnings > 0; // For cash games, profit = positive winnings
-
-    if (currentStreak === 0) {
-      // First game in streak
-      currentStreak = 1;
-      streakType = isProfit ? 'win' : 'loss';
-    } else if (
-      (streakType === 'win' && isProfit) ||
-      (streakType === 'loss' && !isProfit)
     ) {
       // Continue current streak
       currentStreak++;
@@ -413,26 +390,41 @@ export const calculateSideBetWinnings = (
   const resultSideBets = extractSideBetData(playerResult);
 
   return resultSideBets.reduce((total, sideBet) => {
+    const playerTP = Number.isInteger(sideBet.timesParticipated)
+      ? sideBet.timesParticipated
+      : sideBet.participated
+        ? 1
+        : 0;
+
     if (sideBet.won) {
-      // Winner gets the entire pot for this side bet
-      const participants = allResults.filter((r) => {
+      // Compute weighted participants and winners based on timesParticipated
+      let participantsWeight = 0;
+      let winnersWeight = 0;
+
+      allResults.forEach((r) => {
         const rSideBets = extractSideBetData(r);
         const rSideBet = rSideBets.find((sb) => sb.id === sideBet.id);
-        return rSideBet && rSideBet.participated;
+        if (!rSideBet) return;
+        const tp = Number.isInteger(rSideBet.timesParticipated)
+          ? rSideBet.timesParticipated
+          : rSideBet.participated
+            ? 1
+            : 0;
+        if (tp > 0) participantsWeight += tp;
+        if (rSideBet.won && tp > 0) winnersWeight += tp;
       });
-      const winners = allResults.filter((r) => {
-        const rSideBets = extractSideBetData(r);
-        const rSideBet = rSideBets.find((sb) => sb.id === sideBet.id);
-        return rSideBet && rSideBet.won;
-      });
-      const totalPot = participants.length * (sideBet.amount || 0);
-      const winningsPerWinner =
-        winners.length > 0 ? totalPot / winners.length : 0;
-      return total + winningsPerWinner - (sideBet.amount || 0); // Net winnings (pot share minus their bet)
+
+      const totalPot = participantsWeight * (sideBet.amount || 0);
+      const winningsForThisPlayer =
+        winnersWeight > 0 ? (playerTP / winnersWeight) * totalPot : 0;
+      // Net winnings: share of pot minus player's cost
+      return total + winningsForThisPlayer - playerTP * (sideBet.amount || 0);
     }
-    if (sideBet.participated) {
-      return total - (sideBet.amount || 0);
+
+    if (playerTP > 0) {
+      return total - playerTP * (sideBet.amount || 0);
     }
+
     return total;
   }, 0);
 };

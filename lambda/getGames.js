@@ -36,16 +36,32 @@ exports.handler = async (event) => {
 
     if (qs.groupId) {
       // Query games by groupId via groupId-index
-      const params = {
-        TableName: TABLE_NAME,
-        IndexName: 'groupId-index',
-        KeyConditionExpression: 'groupId = :groupId',
-        ExpressionAttributeValues: { ':groupId': qs.groupId },
-        ...paginationParams
-      };
-      const result = await dynamodb.send(new QueryCommand(params));
-      items = result.Items || [];
-      lastKey = result.LastEvaluatedKey;
+      // Handle pagination to get ALL games for the group
+      let continueQuery = true;
+      let queryLastKey = paginationParams.ExclusiveStartKey || null;
+
+      while (continueQuery) {
+        const params = {
+          TableName: TABLE_NAME,
+          IndexName: 'groupId-index',
+          KeyConditionExpression: 'groupId = :groupId',
+          ExpressionAttributeValues: { ':groupId': qs.groupId }
+        };
+
+        if (queryLastKey) {
+          params.ExclusiveStartKey = queryLastKey;
+        }
+
+        const result = await dynamodb.send(new QueryCommand(params));
+        items.push(...(result.Items || []));
+        queryLastKey = result.LastEvaluatedKey;
+
+        // Continue if there are more items and we haven't reached requested limit
+        continueQuery = queryLastKey && items.length < requestedLimit;
+      }
+
+      // Set lastKey for client pagination
+      lastKey = queryLastKey;
     } else if ((qs.status || '').toLowerCase() === 'scheduled') {
       // Query scheduled games via status-date-index
       const params = {
@@ -62,14 +78,34 @@ exports.handler = async (event) => {
       lastKey = result.LastEvaluatedKey;
     } else {
       // Fallback to scan for all games (less efficient)
-      const params = {
-        TableName: TABLE_NAME,
-        ...paginationParams
-      };
-      const result = await dynamodb.send(new ScanCommand(params));
-      items = result.Items || [];
-      lastKey = result.LastEvaluatedKey;
+      // Handle pagination to get ALL games
+      let continueScan = true;
+      let scanLastKey = paginationParams.ExclusiveStartKey || null;
+
+      while (continueScan) {
+        const params = {
+          TableName: TABLE_NAME
+        };
+
+        if (scanLastKey) {
+          params.ExclusiveStartKey = scanLastKey;
+        }
+
+        const result = await dynamodb.send(new ScanCommand(params));
+        items.push(...(result.Items || []));
+        scanLastKey = result.LastEvaluatedKey;
+
+        console.log(`Scanned ${result.Items?.length || 0} games, total so far: ${items.length}, hasMore: ${!!scanLastKey}`);
+
+        // Continue if there are more items and we haven't reached requested limit
+        continueScan = scanLastKey && items.length < requestedLimit;
+      }
+
+      // Set lastKey for client pagination
+      lastKey = scanLastKey;
     }
+
+    console.log(`Total games fetched: ${items.length}, returning to client`);
     
     // Sort games by date and game number
     const sortedGames = items.sort((a, b) => {

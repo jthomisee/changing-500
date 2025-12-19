@@ -27,6 +27,10 @@ const GameHistoryPage = () => {
 
   // Filter to only completed games and calculate combined statistics
   const { completedUserGames, stats } = useMemo(() => {
+    console.log(
+      `[GameHistoryPage] Starting filter with ${userGames.length} total games`
+    );
+
     if (!userGames.length) {
       return {
         completedUserGames: [],
@@ -48,12 +52,24 @@ const GameHistoryPage = () => {
       // Only include games from today or earlier, and with results
       return gameDate <= today && game.results && game.results.length > 0;
     });
+    console.log(
+      `[GameHistoryPage] After date filter: ${completedGames.length} completed games`
+    );
 
     // Filter to only games where user participated (should already be calculated by useAllUserGames)
     const userGamesWithResults = completedGames.filter((game) => {
+      const hasUserPosition = game.userPosition !== undefined;
+      if (!hasUserPosition) {
+        console.warn(
+          `[GameHistoryPage] Filtering out game ${game.id} (${game.date}) - userPosition is undefined`
+        );
+      }
       // Only include games where we have user result data
-      return game.userPosition !== undefined;
+      return hasUserPosition;
     });
+    console.log(
+      `[GameHistoryPage] After userPosition filter: ${userGamesWithResults.length} games with user results`
+    );
 
     const calculatedStats = calculateUserCombinedStats(
       userGamesWithResults,

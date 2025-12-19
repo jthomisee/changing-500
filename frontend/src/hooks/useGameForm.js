@@ -9,10 +9,6 @@ const initialResult = {
   rebuys: 0,
   sideBets: [], // Array of side bet participation/win data
   rsvpStatus: 'pending',
-
-  // Cash game specific fields
-  buyInAmount: 0, // How much they bought in for (cash games)
-  cashOutAmount: 0, // How much they left with (cash games)
 };
 
 const initialGameState = {
@@ -23,23 +19,8 @@ const initialGameState = {
   selectedSideBets: [], // Array of side bet IDs selected for this game
 
   // Game type and configuration
-  gameType: 'tournament', // 'cash' or 'tournament'
+  gameType: 'tournament',
   buyin: 20, // Default buy-in amount
-
-  // House take configuration
-  houseTake: 0, // Amount or percentage taken by house
-  houseTakeType: 'fixed', // 'fixed' (dollar amount) or 'percentage'
-
-  // Tournament payout structure (for tournament games)
-  payoutStructure: [
-    { position: 1, type: 'percentage', value: 70 }, // 1st place gets 70%
-    { position: 2, type: 'buyin_return', value: 1 }, // 2nd place gets buyin back
-    // Remaining goes to house/missing players
-  ],
-
-  // Cash game settings
-  maxBuyIn: 200, // Maximum buy-in for cash games
-  minBuyIn: 20, // Minimum buy-in for cash games
 };
 
 export const useGameForm = () => {

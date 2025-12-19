@@ -797,8 +797,8 @@ const UserProfile = () => {
                       <p className="text-xs text-amber-800">
                         <strong>SMS Consent:</strong> By enabling SMS
                         notifications, you consent to receive text messages from
-                        Changing 500. Message and data rates may apply. Reply
-                        STOP to opt out. See our{' '}
+                        Changing 500. Message and data rates may apply. Message
+                        frequency may vary. Reply STOP to opt out. See our{' '}
                         <a
                           href="/terms"
                           className="underline hover:text-amber-900"

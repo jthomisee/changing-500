@@ -17,7 +17,6 @@ const LeaderboardSection = ({
   handleSort,
   expandedRows,
   toggleRowExpanded,
-  gameType = 'tournament', // 'tournament' or 'cash'
 }) => {
   const allExpanded =
     standings.length > 0 &&
@@ -74,14 +73,12 @@ const LeaderboardSection = ({
               <TrendingUp className="w-6 h-6 text-blue-600" />
               <div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                  {gameType === 'cash' ? 'Cash Game' : 'Tournament'} Leaderboard
+                  Tournament Leaderboard
                 </h2>
-                {gameType === 'tournament' && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Points = Players - Position (tied positions split points
-                    equally)
-                  </p>
-                )}
+                <p className="text-sm text-gray-600 mt-1">
+                  Points = Players - Position (tied positions split points
+                  equally)
+                </p>
               </div>
             </div>
           </div>
@@ -108,14 +105,12 @@ const LeaderboardSection = ({
               <TrendingUp className="w-6 h-6 text-blue-600" />
               <div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                  {gameType === 'cash' ? 'Cash Game' : 'Tournament'} Leaderboard
+                  Tournament Leaderboard
                 </h2>
-                {gameType === 'tournament' && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Points = Players - Position (tied positions split points
-                    equally)
-                  </p>
-                )}
+                <p className="text-sm text-gray-600 mt-1">
+                  Points = Players - Position (tied positions split points
+                  equally)
+                </p>
               </div>
             </div>
           </div>
@@ -133,14 +128,12 @@ const LeaderboardSection = ({
             <TrendingUp className="w-6 h-6 text-blue-600" />
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                {gameType === 'cash' ? 'Cash Game' : 'Tournament'} Leaderboard
+                Tournament Leaderboard
               </h2>
-              {gameType === 'tournament' && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Points = Players - Position (tied positions split points
-                  equally)
-                </p>
-              )}
+              <p className="text-sm text-gray-600 mt-1">
+                Points = Players - Position (tied positions split points
+                equally)
+              </p>
             </div>
           </div>
           {isMobile && standings.length > 0 && (
@@ -179,17 +172,15 @@ const LeaderboardSection = ({
                 >
                   Player
                 </SortableHeader>
-                {gameType !== 'cash' && (
-                  <SortableHeader
-                    field="points"
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
-                    Points
-                  </SortableHeader>
-                )}
+                <SortableHeader
+                  field="points"
+                  align="text-center"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Points
+                </SortableHeader>
                 <SortableHeader
                   field="games"
                   align="text-center"
@@ -206,19 +197,17 @@ const LeaderboardSection = ({
                   sortDirection={sortDirection}
                   onSort={handleSort}
                 >
-                  {gameType === 'cash' ? 'Profit Rate' : 'Win Rate'}
+                  Win Rate
                 </SortableHeader>
-                {gameType !== 'cash' && (
-                  <SortableHeader
-                    field="avgPosition"
-                    align="text-center"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
-                    Avg Pos
-                  </SortableHeader>
-                )}
+                <SortableHeader
+                  field="avgPosition"
+                  align="text-center"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Avg Pos
+                </SortableHeader>
                 <SortableHeader
                   field="currentStreak"
                   align="text-center"
@@ -277,25 +266,19 @@ const LeaderboardSection = ({
                       {player.player}
                     </div>
                   </td>
-                  {gameType !== 'cash' && (
-                    <td className="px-4 py-3 text-center font-semibold text-blue-600">
-                      {player.points}
-                    </td>
-                  )}
+                  <td className="px-4 py-3 text-center font-semibold text-blue-600">
+                    {player.points}
+                  </td>
                   <td className="px-4 py-3 text-center">{player.games}</td>
                   <td className="px-4 py-3 text-center">
                     {player.winRate.toFixed(1)}%
                     <div className="text-xs text-gray-500">
-                      {gameType === 'cash'
-                        ? `${player.wins} profitable games`
-                        : `${player.wins}W - ${player.games - player.wins}L`}
+                      {player.wins}W - {player.games - player.wins}L
                     </div>
                   </td>
-                  {gameType !== 'cash' && (
-                    <td className="px-4 py-3 text-center">
-                      {player.avgPosition.toFixed(1)}
-                    </td>
-                  )}
+                  <td className="px-4 py-3 text-center">
+                    {player.avgPosition.toFixed(1)}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {player.streakType === 'win' ? (
                       <span className="text-green-600 font-semibold">
@@ -369,14 +352,12 @@ const LeaderboardSection = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {gameType !== 'cash' && (
-                        <div className="text-right">
-                          <div className="font-semibold text-blue-600 text-lg">
-                            {player.points}
-                          </div>
-                          <div className="text-xs text-gray-500">points</div>
+                      <div className="text-right">
+                        <div className="font-semibold text-blue-600 text-lg">
+                          {player.points}
                         </div>
-                      )}
+                        <div className="text-xs text-gray-500">points</div>
+                      </div>
                       <ChevronDown
                         className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       />
@@ -388,28 +369,22 @@ const LeaderboardSection = ({
                   <div className="px-4 pb-4 border-t border-gray-200 bg-white bg-opacity-50">
                     <div className="grid grid-cols-2 gap-4 pt-4">
                       <div className="text-center">
-                        <div className="text-sm text-gray-500">
-                          {gameType === 'cash' ? 'Profit Rate' : 'Win Rate'}
-                        </div>
+                        <div className="text-sm text-gray-500">Win Rate</div>
                         <div className="font-semibold">
                           {player.winRate.toFixed(1)}%
                         </div>
                         <div className="text-xs text-gray-400">
-                          {gameType === 'cash'
-                            ? `${player.wins} profitable`
-                            : `${player.wins}W - ${player.games - player.wins}L`}
+                          {player.wins}W - {player.games - player.wins}L
                         </div>
                       </div>
-                      {gameType !== 'cash' && (
-                        <div className="text-center">
-                          <div className="text-sm text-gray-500">
-                            Avg Position
-                          </div>
-                          <div className="font-semibold">
-                            {player.avgPosition.toFixed(1)}
-                          </div>
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500">
+                          Avg Position
                         </div>
-                      )}
+                        <div className="font-semibold">
+                          {player.avgPosition.toFixed(1)}
+                        </div>
+                      </div>
                       <div className="text-center">
                         <div className="text-sm text-gray-500">
                           Current Streak

@@ -55,18 +55,35 @@ exports.handler = async (event) => {
 
     // Query games for each group in parallel
     const gameQueries = groupIds.map(async (groupId) => {
-      const gamesParams = {
-        TableName: GAMES_TABLE,
-        IndexName: 'groupId-index',
-        KeyConditionExpression: 'groupId = :groupId',
-        ExpressionAttributeValues: { ':groupId': groupId }
-      };
+      const allGroupGames = [];
+      let lastEvaluatedKey = null;
 
-      const gamesResult = await dynamodb.send(new QueryCommand(gamesParams));
-      return gamesResult.Items || [];
+      // Keep querying until we get all games (handle pagination)
+      do {
+        const gamesParams = {
+          TableName: GAMES_TABLE,
+          IndexName: 'groupId-index',
+          KeyConditionExpression: 'groupId = :groupId',
+          ExpressionAttributeValues: { ':groupId': groupId }
+        };
+
+        if (lastEvaluatedKey) {
+          gamesParams.ExclusiveStartKey = lastEvaluatedKey;
+        }
+
+        const gamesResult = await dynamodb.send(new QueryCommand(gamesParams));
+        allGroupGames.push(...(gamesResult.Items || []));
+        lastEvaluatedKey = gamesResult.LastEvaluatedKey;
+
+        console.log(`Fetched ${gamesResult.Items?.length || 0} games for group ${groupId}, total so far: ${allGroupGames.length}, hasMore: ${!!lastEvaluatedKey}`);
+      } while (lastEvaluatedKey);
+
+      console.log(`Final count for group ${groupId}: ${allGroupGames.length} games`);
+      return allGroupGames;
     });
 
     const gamesByGroup = await Promise.all(gameQueries);
+    console.log(`Total games from all groups before filtering: ${gamesByGroup.flat().length}`);
 
     // Flatten all games from all groups
     gamesByGroup.forEach(games => {
@@ -77,6 +94,7 @@ exports.handler = async (event) => {
     const userGames = allGames.filter(game => {
       return game.results && game.results.some(result => result.userId === userId);
     });
+    console.log(`After filtering for user ${userId}: ${userGames.length} games`);
 
     // Step 4: Remove duplicates (in case user is in multiple groups with overlapping games)
     const uniqueGames = userGames.reduce((unique, game) => {
@@ -86,12 +104,15 @@ exports.handler = async (event) => {
       }
       return unique;
     }, []);
+    console.log(`After deduplication: ${uniqueGames.length} unique games`);
 
     // Step 5: Sort by date (newest first)
     uniqueGames.sort((a, b) => {
       const dateCompare = b.date.localeCompare(a.date);
       return dateCompare !== 0 ? dateCompare : (b.gameNumber || 0) - (a.gameNumber || 0);
     });
+
+    console.log(`Returning ${uniqueGames.length} games to client`);
 
     return {
       statusCode: 200,

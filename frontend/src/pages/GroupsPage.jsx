@@ -43,11 +43,6 @@ const GroupsPage = ({
   tournamentSortField,
   tournamentSortDirection,
   handleTournamentSort,
-  cashStandings,
-  cashStandingsLoading,
-  cashSortField,
-  cashSortDirection,
-  handleCashSort,
   expandedRows,
   toggleRowExpanded,
   isMobile,
@@ -284,20 +279,6 @@ const GroupsPage = ({
                 handleSort={handleTournamentSort}
                 expandedRows={expandedRows}
                 toggleRowExpanded={toggleRowExpanded}
-                gameType="tournament"
-              />
-
-              {/* Cash Game Leaderboard */}
-              <LeaderboardSection
-                isMobile={isMobile}
-                standings={cashStandings}
-                standingsLoading={cashStandingsLoading}
-                sortField={cashSortField}
-                sortDirection={cashSortDirection}
-                handleSort={handleCashSort}
-                expandedRows={expandedRows}
-                toggleRowExpanded={toggleRowExpanded}
-                gameType="cash"
               />
             </GameProvider>
           </div>
